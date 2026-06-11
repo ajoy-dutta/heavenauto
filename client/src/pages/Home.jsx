@@ -1,15 +1,8 @@
-import Hero from '../components/Hero';
-
-const Home = () => {
-  return (
-    <main>
-      <Hero />
-      {/* You can add more sections here later like Categories, Featured Products, etc. */}
-      <div className="py-20 px-12 text-center text-gray-400">
-        <h2>More content goes here (Features, Products, Footer)</h2>
+export default function Home() {
+    return (
+      <div className="text-center py-20">
+        <h1 className="text-5xl font-extrabold text-gray-900 mb-4">Welcome to Heaven Autos</h1>
+        <p className="text-xl text-gray-600">The premier destination for premium moto parts.</p>
       </div>
-    </main>
-  );
-};
-
-export default Home;
+    );
+  }

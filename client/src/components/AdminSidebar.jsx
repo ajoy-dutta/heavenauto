@@ -1,57 +1,204 @@
-import { Link } from 'react-router-dom';
-import { FiUser, FiMonitor, FiSettings, FiBarChart2, FiLogOut } from "react-icons/fi";
-import { FaCaretDown } from "react-icons/fa";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { 
+  FiUsers, 
+  FiBriefcase, 
+  FiChevronDown, 
+  FiChevronRight, 
+  FiList, 
+  FiPlus,
+  FiBox,
+  FiShoppingCart,
+  FiDollarSign,
+  FiHome,
+  FiMenu, // Added for mobile hamburger icon
+  FiX     // Added for mobile close icon
+} from "react-icons/fi";
 
-const AdminSidebar = () => {
-  // Mapping the exact menu items from your provided image
-  const menuItems = [
-  { name: 'Shop Profile', icon: FiUser, isDropdown: false, path: '/dashboard/profile' },
-  { name: 'Dashboard', icon: FiMonitor, isDropdown: false, path: '/dashboard' },
-  // Let's point these to placeholder routes for now
-  { name: 'Employee Manage', icon: FiSettings, isDropdown: true, path: '/dashboard/employees' },
-  { name: 'Product', icon: FiSettings, isDropdown: true, path: '/dashboard/products' },
-  { name: 'Exporter', icon: FiSettings, isDropdown: true, path: '/dashboard/exporter' },
-  // You can add paths to the rest as you build them
-  { name: 'Product Purchase', icon: FiBarChart2, isDropdown: false, path: '/dashboard/purchases' },
-  { name: 'Stock', icon: FiSettings, isDropdown: true, path: '/dashboard/stock' },
-  { name: 'Settings', icon: FiSettings, isDropdown: true, path: '/dashboard/settings' },
-  { name: 'Logout', icon: FiLogOut, isDropdown: false, path: '/' },
-];
+export default function AdminSidebar() {
+  // Existing state
+  const [isEmployeeOpen, setIsEmployeeOpen] = useState(false);
+  const [isCustomerOpen, setIsCustomerOpen] = useState(false);
+  
+  // New state for mobile responsiveness
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const navigate = useNavigate();
+
+  // Integrated Logout Logic
+  const handleLogout = () => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    navigate('/');
+  };
 
   return (
-    <div className="w-64 min-h-screen bg-[#304156] text-white flex flex-col font-sans">
-      
-      {/* Top Logo Area */}
-      <div className="flex items-center h-14 bg-[#263445] px-4 font-bold text-lg tracking-wide border-b border-gray-700/50">
-        <div className="bg-white text-ha-red font-black px-1.5 py-0.5 text-xs rounded mr-2 flex flex-col items-center leading-none">
-          <span>h</span><span className="text-black">a</span>
-        </div>
-        HEAVEN AUTOS
-      </div>
+    <>
+      {/* Mobile Hamburger Button (Floating top left) - Hidden on desktop */}
+      {!isMobileMenuOpen && (
+        <button 
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="md:hidden fixed top-4 left-4 z-40 p-2 bg-gray-900 text-white rounded shadow-lg hover:bg-gray-800 transition"
+        >
+          <FiMenu size={24} />
+        </button>
+      )}
 
-      {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto py-2 custom-scrollbar">
-        {menuItems.map((item, index) => (
-          <Link 
-            key={index}
-            to={item.path || "#"}
-            className="flex items-center justify-between px-5 py-3.5 hover:bg-[#263445] transition-colors border-b border-[#3b4d63] cursor-pointer group"
+      {/* Mobile Background Overlay - Darkens background when sidebar is open */}
+      {isMobileMenuOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-40 transition-opacity"
+          onClick={() => setIsMobileMenuOpen(false)}
+        ></div>
+      )}
+
+      {/* Sidebar Container */}
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white flex flex-col min-h-screen shadow-2xl 
+        transform transition-transform duration-300 ease-in-out
+        md:relative md:translate-x-0
+        ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
+      `}>
+        
+        {/* Brand Header */}
+        <div className="p-6 text-2xl font-extrabold border-b border-gray-800 text-red-500 tracking-wider flex justify-between items-center">
+          <span>HA ADMIN</span>
+          {/* Mobile Close Button */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="md:hidden text-gray-400 hover:text-white transition"
           >
-            <div className="flex items-center gap-3">
-              <item.icon className="text-[#3b82f6] text-lg group-hover:text-blue-400" />
-              <span className="text-sm font-semibold text-gray-200 group-hover:text-white">
-                {item.name}
-              </span>
-            </div>
-            {item.isDropdown && (
-              <FaCaretDown className="text-[#3b82f6] text-xs" />
-            )}
+            <FiX size={28} />
+          </button>
+        </div>
+        
+        {/* Main Navigation */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+          
+          {/* Dashboard Home */}
+          <Link 
+            to="/dashboard" 
+            onClick={() => setIsMobileMenuOpen(false)} // Close menu on click (mobile)
+            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition font-medium text-white mb-2"
+          >
+            <FiHome className="text-gray-400" />
+            <span>Dashboard Home</span>
           </Link>
-        ))}
-      </div>
-      
-    </div>
-  );
-};
 
-export default AdminSidebar;
+          {/* --- PEOPLE MANAGEMENT SECTION --- */}
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-6 font-bold px-3">
+            People
+          </div>
+          
+          {/* Employee Dropdown */}
+          <div>
+            <button 
+              onClick={() => setIsEmployeeOpen(!isEmployeeOpen)}
+              className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
+            >
+              <div className="flex items-center gap-2">
+                <FiBriefcase className="text-gray-400" />
+                <span>Employees</span>
+              </div>
+              {isEmployeeOpen ? <FiChevronDown /> : <FiChevronRight />}
+            </button>
+            
+            {/* Employee Sub-menu Items */}
+            {isEmployeeOpen && (
+              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
+                <Link 
+                  to="/dashboard/employees" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                >
+                  <FiList /> Employee List
+                </Link>
+                <Link 
+                  to="/dashboard/employees/add" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                >
+                  <FiPlus /> Add New Employee
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* Customer Dropdown */}
+          <div>
+            <button 
+              onClick={() => setIsCustomerOpen(!isCustomerOpen)}
+              className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
+            >
+              <div className="flex items-center gap-2">
+                <FiUsers className="text-gray-400" />
+                <span>Customers</span>
+              </div>
+              {isCustomerOpen ? <FiChevronDown /> : <FiChevronRight />}
+            </button>
+            
+            {/* Customer Sub-menu Items */}
+            {isCustomerOpen && (
+              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
+                <Link 
+                  to="/dashboard/customers" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                >
+                  <FiList /> Customer List
+                </Link>
+                <Link 
+                  to="/dashboard/customers/add" 
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                >
+                  <FiPlus /> Add New Customer
+                </Link>
+              </div>
+            )}
+          </div>
+
+          {/* --- INVENTORY & SALES SECTION --- */}
+          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-6 font-bold px-3">
+            Warehouse
+          </div>
+          <Link 
+            to="/dashboard/products" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition text-gray-300 hover:text-white"
+          >
+            <FiBox className="text-gray-400" />
+            <span>Stock Management</span>
+          </Link>
+          <Link 
+            to="/dashboard/purchases" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition text-gray-300 hover:text-white"
+          >
+            <FiShoppingCart className="text-gray-400" />
+            <span>Purchase History</span>
+          </Link>
+          <Link 
+            to="/dashboard/sales" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition text-gray-300 hover:text-white"
+          >
+            <FiDollarSign className="text-gray-400" />
+            <span>Sales & Profit</span>
+          </Link>
+          
+        </nav>
+
+        {/* Bottom Actions - Secure Logout */}
+        <div className="border-t border-gray-800 mt-auto">
+          <button 
+            onClick={handleLogout}
+            className="w-full p-4 bg-red-600 hover:bg-red-700 text-center font-bold transition duration-300"
+          >
+            Secure Logout
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}

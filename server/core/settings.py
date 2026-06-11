@@ -33,7 +33,7 @@ INSTALLED_APPS = [
     
     # Custom apps
     'person',
-    'inventory',
+
 ]
 
 MIDDLEWARE = [
