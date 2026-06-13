@@ -33,6 +33,8 @@ INSTALLED_APPS = [
     
     # Custom apps
     'person',
+    'products',
+    'purchase',
 
 ]
 
