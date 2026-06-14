@@ -11,7 +11,7 @@ def create_stock_for_new_product(sender, instance, created, **kwargs):
     if created:
         Stock.objects.create(product=instance, current_quantity=0)
 
-# 2. ADD to stock when a Purchase is saved
+# 2. ADD to stock when a Purchase is saveds
 @receiver(post_save, sender=Purchase)
 def add_stock_on_purchase(sender, instance, created, **kwargs):
     if created:
