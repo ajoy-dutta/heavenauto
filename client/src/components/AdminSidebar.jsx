@@ -19,6 +19,7 @@ import {
   FiPieChart,
   FiSettings
 } from "react-icons/fi";
+import logo from "../assets/logo.jpg";
 
 export default function AdminSidebar() {
   // Single state object to handle ALL dropdowns dynamically
@@ -72,7 +73,7 @@ export default function AdminSidebar() {
     { id: 5, type: "link", to: "/dashboard/purchases", label: "Purchase History", icon: FiShoppingCart },
     { id: 6, type: "link", to: "/dashboard/sales", label: "Sales & Profit", icon: FiDollarSign },
 
-    // --- ACCOUNTS & REPORTS (Added to meet the 11 options requirement) ---
+    // --- ACCOUNTS & REPORTS ---
     { id: "h3", type: "heading", label: "Business Operations" },
     { id: 7, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
     { id: 8, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
@@ -109,12 +110,25 @@ export default function AdminSidebar() {
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         
-        {/* Header */}
-        <div className="p-6 text-2xl font-extrabold border-b border-gray-800 text-red-500 tracking-wider flex justify-between items-center">
-          <span>HA ADMIN</span>
+        {/* Header - NOW WITH PRESSABLE LOGO AND TEXT */}
+        <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-950">
+          <Link 
+            to="/dashboard" 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+          >
+            <img 
+              src={logo} 
+              alt="Heaven Autos Logo" 
+              className="h-10 w-auto rounded object-contain flex-shrink-0" 
+            />
+            <span className="text-lg font-bold text-white tracking-wide">
+              Heaven Autos
+            </span>
+          </Link>
           <button 
             onClick={() => setIsMobileMenuOpen(false)}
-            className="md:hidden text-gray-400 hover:text-white transition"
+            className="md:hidden text-gray-400 hover:text-white transition flex-shrink-0"
           >
             <FiX size={28} />
           </button>
