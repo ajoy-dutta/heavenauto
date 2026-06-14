@@ -12,16 +12,18 @@ import {
   FiDollarSign,
   FiHome,
   FiMenu, 
-  FiX     
+  FiX,
+  FiTruck,
+  FiAlertCircle,
+  FiFileText,
+  FiPieChart,
+  FiSettings
 } from "react-icons/fi";
 
 export default function AdminSidebar() {
-  const [isEmployeeOpen, setIsEmployeeOpen] = useState(false);
-  const [isCustomerOpen, setIsCustomerOpen] = useState(false);
-  const [isProductOpen, setIsProductOpen] = useState(false); // ✅ Added Product State
-  
+  // Single state object to handle ALL dropdowns dynamically
+  const [openDropdowns, setOpenDropdowns] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -30,8 +32,58 @@ export default function AdminSidebar() {
     navigate('/');
   };
 
+  const toggleDropdown = (key) => {
+    setOpenDropdowns((prev) => ({
+      ...prev,
+      [key]: !prev[key]
+    }));
+  };
+
+  // 🚀 The ultimate scalable navigation array (11 Options + Headings)
+  const navItems = [
+    { id: 1, type: "link", to: "/dashboard", label: "Dashboard Home", icon: FiHome },
+    
+    // --- PEOPLE MANAGEMENT ---
+    { id: "h1", type: "heading", label: "People" },
+    { 
+      id: 2, type: "dropdown", label: "Employees", icon: FiBriefcase, stateKey: "employees",
+      subItems: [
+        { to: "/dashboard/employees", label: "Employee List", icon: FiList },
+        { to: "/dashboard/employees/add", label: "Add New Employee", icon: FiPlus },
+      ]
+    },
+    { 
+      id: 3, type: "dropdown", label: "Customers", icon: FiUsers, stateKey: "customers",
+      subItems: [
+        { to: "/dashboard/customers", label: "Customer List", icon: FiList },
+        { to: "/dashboard/customers/add", label: "Add New Customer", icon: FiPlus },
+      ]
+    },
+
+    // --- WAREHOUSE & INVENTORY ---
+    { id: "h2", type: "heading", label: "Warehouse" },
+    { 
+      id: 4, type: "dropdown", label: "Products", icon: FiBox, stateKey: "products",
+      subItems: [
+        { to: "/dashboard/products", label: "Product List", icon: FiList },
+        { to: "/dashboard/products/add", label: "Add New Product", icon: FiPlus },
+      ]
+    },
+    { id: 5, type: "link", to: "/dashboard/purchases", label: "Purchase History", icon: FiShoppingCart },
+    { id: 6, type: "link", to: "/dashboard/sales", label: "Sales & Profit", icon: FiDollarSign },
+
+    // --- ACCOUNTS & REPORTS (Added to meet the 11 options requirement) ---
+    { id: "h3", type: "heading", label: "Business Operations" },
+    { id: 7, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
+    { id: 8, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
+    { id: 9, type: "link", to: "/dashboard/accounts", label: "Accounts & Ledgers", icon: FiFileText },
+    { id: 10, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
+    { id: 11, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },
+  ];
+
   return (
     <>
+      {/* Mobile Menu Toggle Button */}
       {!isMobileMenuOpen && (
         <button 
           onClick={() => setIsMobileMenuOpen(true)}
@@ -41,6 +93,7 @@ export default function AdminSidebar() {
         </button>
       )}
 
+      {/* Mobile Background Overlay */}
       {isMobileMenuOpen && (
         <div 
           className="md:hidden fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm z-40 transition-opacity"
@@ -48,6 +101,7 @@ export default function AdminSidebar() {
         ></div>
       )}
 
+      {/* Sidebar Container */}
       <aside className={`
         fixed inset-y-0 left-0 z-50 w-64 bg-gray-900 text-white flex flex-col min-h-screen shadow-2xl 
         transform transition-transform duration-300 ease-in-out
@@ -55,6 +109,7 @@ export default function AdminSidebar() {
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         
+        {/* Header */}
         <div className="p-6 text-2xl font-extrabold border-b border-gray-800 text-red-500 tracking-wider flex justify-between items-center">
           <span>HA ADMIN</span>
           <button 
@@ -65,145 +120,78 @@ export default function AdminSidebar() {
           </button>
         </div>
         
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          
-          <Link 
-            to="/dashboard" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition font-medium text-white mb-2"
-          >
-            <FiHome className="text-gray-400" />
-            <span>Dashboard Home</span>
-          </Link>
-
-          {/* --- PEOPLE MANAGEMENT SECTION --- */}
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-6 font-bold px-3">
-            People
-          </div>
-          
-          {/* Employee Dropdown */}
-          <div>
-            <button 
-              onClick={() => setIsEmployeeOpen(!isEmployeeOpen)}
-              className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
-            >
-              <div className="flex items-center gap-2">
-                <FiBriefcase className="text-gray-400" />
-                <span>Employees</span>
-              </div>
-              {isEmployeeOpen ? <FiChevronDown /> : <FiChevronRight />}
-            </button>
+        {/* Navigation Map */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto custom-scrollbar">
+          {navItems.map((item) => {
             
-            {isEmployeeOpen && (
-              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
-                <Link 
-                  to="/dashboard/employees" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
-                >
-                  <FiList /> Employee List
-                </Link>
-                <Link 
-                  to="/dashboard/employees/add" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
-                >
-                  <FiPlus /> Add New Employee
-                </Link>
-              </div>
-            )}
-          </div>
+            // 1. Render Headings
+            if (item.type === "heading") {
+              return (
+                <div key={item.id} className="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-6 font-bold px-3">
+                  {item.label}
+                </div>
+              );
+            }
 
-          {/* Customer Dropdown */}
-          <div>
-            <button 
-              onClick={() => setIsCustomerOpen(!isCustomerOpen)}
-              className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
-            >
-              <div className="flex items-center gap-2">
-                <FiUsers className="text-gray-400" />
-                <span>Customers</span>
-              </div>
-              {isCustomerOpen ? <FiChevronDown /> : <FiChevronRight />}
-            </button>
-            
-            {isCustomerOpen && (
-              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
+            // 2. Render Single Links
+            if (item.type === "link") {
+              const Icon = item.icon;
+              return (
                 <Link 
-                  to="/dashboard/customers" 
+                  key={item.id}
+                  to={item.to} 
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                  className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition font-medium text-gray-300 hover:text-white mb-1"
                 >
-                  <FiList /> Customer List
+                  <Icon className="text-gray-400" />
+                  <span>{item.label}</span>
                 </Link>
-                <Link 
-                  to="/dashboard/customers/add" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
-                >
-                  <FiPlus /> Add New Customer
-                </Link>
-              </div>
-            )}
-          </div>
+              );
+            }
 
-          {/* --- INVENTORY & SALES SECTION --- */}
-          <div className="text-xs text-gray-500 uppercase tracking-wider mb-2 mt-6 font-bold px-3">
-            Warehouse
-          </div>
-
-          {/* ✅ Product Dropdown Added Here */}
-          <div>
-            <button 
-              onClick={() => setIsProductOpen(!isProductOpen)}
-              className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
-            >
-              <div className="flex items-center gap-2">
-                <FiBox className="text-gray-400" />
-                <span>Products</span>
-              </div>
-              {isProductOpen ? <FiChevronDown /> : <FiChevronRight />}
-            </button>
-            
-            {isProductOpen && (
-              <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
-                <Link 
-                  to="/dashboard/products" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
-                >
-                  <FiList /> Product List
-                </Link>
-                <Link 
-                  to="/dashboard/products/add" 
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
-                >
-                  <FiPlus /> Add New Product
-                </Link>
-              </div>
-            )}
-          </div>
-
-          <Link 
-            to="/dashboard/purchases" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition text-gray-300 hover:text-white"
-          >
-            <FiShoppingCart className="text-gray-400" />
-            <span>Purchase History</span>
-          </Link>
-          <Link 
-            to="/dashboard/sales" 
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-2 p-3 rounded hover:bg-gray-800 transition text-gray-300 hover:text-white"
-          >
-            <FiDollarSign className="text-gray-400" />
-            <span>Sales & Profit</span>
-          </Link>
-          
+            // 3. Render Dropdowns
+            if (item.type === "dropdown") {
+              const Icon = item.icon;
+              const isOpen = openDropdowns[item.stateKey];
+              
+              return (
+                <div key={item.id} className="mb-1">
+                  <button 
+                    onClick={() => toggleDropdown(item.stateKey)}
+                    className="w-full flex items-center justify-between p-3 rounded hover:bg-gray-800 transition text-gray-300"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Icon className="text-gray-400" />
+                      <span>{item.label}</span>
+                    </div>
+                    {isOpen ? <FiChevronDown /> : <FiChevronRight />}
+                  </button>
+                  
+                  {isOpen && (
+                    <div className="ml-4 mt-1 space-y-1 border-l border-gray-700 pl-2">
+                      {item.subItems.map((sub, idx) => {
+                        const SubIcon = sub.icon;
+                        return (
+                          <Link 
+                            key={idx}
+                            to={sub.to} 
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className="flex items-center gap-2 p-2 rounded hover:bg-gray-800 transition text-sm text-gray-400 hover:text-white"
+                          >
+                            <SubIcon /> {sub.label}
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          })}
         </nav>
 
+        {/* Footer / Logout */}
         <div className="border-t border-gray-800 mt-auto">
           <button 
             onClick={handleLogout}
