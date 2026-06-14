@@ -1,12 +1,9 @@
 from pathlib import Path
 import os
+from datetime import timedelta
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-8&cwt-1w@lxx6^i@&r3q^nw@q9pw5u#4g#p-32!h=xqe_)=*^l'
@@ -18,11 +15,19 @@ ALLOWED_HOSTS = [
     "heavenautos.com.bd",
     "www.heavenautos.com.bd",
     "103.125.252.186",   # optional server IP
+    "127.0.0.1",         # Required for Nginx proxy routing
+    "localhost"
 ]
 
+# --- IMPORTANT FIX FOR NGINX / CSRF BLOCKS ---
+CSRF_TRUSTED_ORIGINS = [
+    'http://heavenautos.com.bd',
+    'https://heavenautos.com.bd',
+    'http://www.heavenautos.com.bd',
+    'https://www.heavenautos.com.bd',
+]
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -33,7 +38,8 @@ INSTALLED_APPS = [
     
     # Third-party apps
     'rest_framework',
-    'corsheaders', # Allows React to talk to Django
+    'rest_framework_simplejwt', # Required for your React Login
+    'corsheaders',              # Allows React to talk to Django
     
     # Custom apps
     'person',
@@ -41,11 +47,10 @@ INSTALLED_APPS = [
     'purchase',
     'sale',
     'stock',
-
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', # Add this at the VERY TOP
+    'corsheaders.middleware.CorsMiddleware', # MUST be at the top
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -75,10 +80,7 @@ TEMPLATES = [
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 WSGI_APPLICATION = 'core.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
@@ -86,60 +88,45 @@ DATABASES = {
     }
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',},
 ]
-
 
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
-STATIC_URL = 'static/'
-
-
-# Add this at the bottom of the file to allow your Vite React app to connect
-CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",
-]
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
+# --- CLEANED UP STATIC & MEDIA FILES ---
 STATIC_URL = '/static/'
-
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+# --- COMBINED CORS ORIGINS ---
 CORS_ALLOWED_ORIGINS = [
     "https://heavenautos.com.bd",
     "https://www.heavenautos.com.bd",
+    "http://localhost:5173",  # Keep local for testing
+    "http://127.0.0.1:5173",
 ]
+
+# --- FIX FOR REACT API CSRF TOKENS ---
+# This forces Django API to ONLY use your JWT token, avoiding CSRF session errors
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+}
+
+# Token Lifetimes (Optional but highly recommended)
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
+}
