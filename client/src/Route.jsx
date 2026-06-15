@@ -16,6 +16,11 @@ import AddEmployee from "./pages/admin/employee/AddEmployee";
 import AddCustomer from "./pages/admin/customer/AddCustomer";
 import ProductList from "./pages/admin/products/ProductList";
 import AddProduct from "./pages/admin/products/AddProduct";
+import PurchaseHistory from './pages/admin/purchase/PurchaseHistory';
+import AddPurchase from './pages/admin/purchase/AddPurchase';
+import StockList from './pages/admin/stock/StockList';
+import SaleHistory from './pages/admin/sales/SaleHistory';
+import AddSale from './pages/admin/sales/AddSale';
 
 export const router = createBrowserRouter([
   {
@@ -46,6 +51,17 @@ export const router = createBrowserRouter([
       { path: "products", element: <ProductList /> },
       { path: "products/add", element: <AddProduct /> },
       { path: "products/edit/:id", element: <AddProduct /> },   // ✅ Added Edit
+
+      // Purchase Routes
+      { path: "purchase", element: <PurchaseHistory /> },
+      { path: "purchase/add", element: <AddPurchase /> },
+
+      // Stock Routes
+      { path: "stock", element: <StockList /> },
+
+      // Sales Routes
+      { path: "sales", element: <SaleHistory /> },
+      { path: "sales/add", element: <AddSale /> },
     ],
   },
 ]);

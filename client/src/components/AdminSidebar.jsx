@@ -40,46 +40,59 @@ export default function AdminSidebar() {
     }));
   };
 
-  // 🚀 The ultimate scalable navigation array (11 Options + Headings)
+  // 🚀 The ultimate scalable navigation array (Rearranged to match business workflow)
   const navItems = [
     { id: 1, type: "link", to: "/dashboard", label: "Dashboard Home", icon: FiHome },
     
-    // --- PEOPLE MANAGEMENT ---
-    { id: "h1", type: "heading", label: "People" },
+    // --- INVENTORY & SALES ---
+    { id: "h1", type: "heading", label: "Inventory & Sales" },
     { 
-      id: 2, type: "dropdown", label: "Employees", icon: FiBriefcase, stateKey: "employees",
+      id: 2, type: "dropdown", label: "Products", icon: FiBox, stateKey: "products",
+      subItems: [
+        { to: "/dashboard/products", label: "Product List", icon: FiList },
+        { to: "/dashboard/products/add", label: "Add New Product", icon: FiPlus },
+      ]
+    },
+    { 
+      id: 3, type: "dropdown", label: "Purchases", icon: FiShoppingCart, stateKey: "purchases",
+      subItems: [
+        { to: "/dashboard/purchase", label: "Purchase History", icon: FiList },
+        { to: "/dashboard/purchase/add", label: "Add New Purchase", icon: FiPlus },
+      ]
+    },
+    { 
+      id: 4, type: "dropdown", label: "Sales", icon: FiDollarSign, stateKey: "sales",
+      subItems: [
+        { to: "/dashboard/sales", label: "Sale History", icon: FiList },
+        { to: "/dashboard/sales/add", label: "Add New Sale", icon: FiPlus },
+      ]
+    },
+    { id: 5, type: "link", to: "/dashboard/stock", label: "Live Stock", icon: FiList },
+
+    // --- PEOPLE MANAGEMENT ---
+    { id: "h2", type: "heading", label: "People" },
+    { 
+      id: 6, type: "dropdown", label: "Employees", icon: FiBriefcase, stateKey: "employees",
       subItems: [
         { to: "/dashboard/employees", label: "Employee List", icon: FiList },
         { to: "/dashboard/employees/add", label: "Add New Employee", icon: FiPlus },
       ]
     },
     { 
-      id: 3, type: "dropdown", label: "Customers", icon: FiUsers, stateKey: "customers",
+      id: 7, type: "dropdown", label: "Customers", icon: FiUsers, stateKey: "customers",
       subItems: [
         { to: "/dashboard/customers", label: "Customer List", icon: FiList },
         { to: "/dashboard/customers/add", label: "Add New Customer", icon: FiPlus },
       ]
     },
 
-    // --- WAREHOUSE & INVENTORY ---
-    { id: "h2", type: "heading", label: "Warehouse" },
-    { 
-      id: 4, type: "dropdown", label: "Products", icon: FiBox, stateKey: "products",
-      subItems: [
-        { to: "/dashboard/products", label: "Product List", icon: FiList },
-        { to: "/dashboard/products/add", label: "Add New Product", icon: FiPlus },
-      ]
-    },
-    { id: 5, type: "link", to: "/dashboard/purchases", label: "Purchase History", icon: FiShoppingCart },
-    { id: 6, type: "link", to: "/dashboard/sales", label: "Sales & Profit", icon: FiDollarSign },
-
     // --- ACCOUNTS & REPORTS ---
     { id: "h3", type: "heading", label: "Business Operations" },
-    { id: 7, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
-    { id: 8, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
-    { id: 9, type: "link", to: "/dashboard/accounts", label: "Accounts & Ledgers", icon: FiFileText },
-    { id: 10, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
-    { id: 11, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },
+    { id: 8, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
+    { id: 9, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
+    { id: 10, type: "link", to: "/dashboard/accounts", label: "Accounts & Ledgers", icon: FiFileText },
+    { id: 11, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
+    { id: 12, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },
   ];
 
   return (
