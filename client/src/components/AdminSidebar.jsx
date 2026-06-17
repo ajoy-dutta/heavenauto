@@ -17,7 +17,8 @@ import {
   FiAlertCircle,
   FiFileText,
   FiPieChart,
-  FiSettings
+  FiSettings,
+  FiLayers // ✅ Added FiLayers for the Chart of Accounts icon
 } from "react-icons/fi";
 import logo from "../assets/logo.jpg";
 
@@ -40,7 +41,7 @@ export default function AdminSidebar() {
     }));
   };
 
-  // 🚀 The ultimate scalable navigation array (Rearranged to match business workflow)
+  // 🚀 The ultimate scalable navigation array
   const navItems = [
     { id: 1, type: "link", to: "/dashboard", label: "Dashboard Home", icon: FiHome },
     
@@ -85,12 +86,21 @@ export default function AdminSidebar() {
         { to: "/dashboard/customers/add", label: "Add New Customer", icon: FiPlus },
       ]
     },
-
+    
     // --- ACCOUNTS & REPORTS ---
     { id: "h3", type: "heading", label: "Business Operations" },
+    
+    // ✅ NEW: Finance Hub Dropdown
+    { 
+      id: "finance", type: "dropdown", label: "Finance & Accounts", icon: FiDollarSign, stateKey: "finance",
+      subItems: [
+        { to: "/dashboard/finance/dashboard", label: "Financial Dashboard", icon: FiPieChart },
+        { to: "/dashboard/finance/chart-of-accounts", label: "Chart of Accounts", icon: FiLayers },
+      ]
+    },
+
     { id: 8, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
     { id: 9, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
-    { id: 10, type: "link", to: "/dashboard/accounts", label: "Accounts & Ledgers", icon: FiFileText },
     { id: 11, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
     { id: 12, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },
   ];

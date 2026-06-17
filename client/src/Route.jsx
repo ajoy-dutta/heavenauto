@@ -22,6 +22,10 @@ import StockList from './pages/admin/stock/StockList';
 import SaleHistory from './pages/admin/sales/SaleHistory';
 import AddSale from './pages/admin/sales/AddSale';
 
+// Finance Pages (Updated Imports)
+import FinancialDashboard from "./pages/admin/finance/FinancialDashboard";
+import ChartOfAccounts from "./pages/admin/finance/ChartOfAccounts";
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -62,6 +66,10 @@ export const router = createBrowserRouter([
       // Sales Routes
       { path: "sales", element: <SaleHistory /> },
       { path: "sales/add", element: <AddSale /> },
+      
+      // Finance Routes (✅ Updated to match your new sidebar links)
+      { path: "finance/dashboard", element: <FinancialDashboard /> },
+      { path: "finance/chart-of-accounts", element: <ChartOfAccounts /> }
     ],
   },
 ]);
