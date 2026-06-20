@@ -1,10 +1,17 @@
 from django.contrib import admin
-from .models import Purchase
+from .models import PurchaseOrder, PurchaseItem
 
-class PurchaseAdmin(admin.ModelAdmin):
-    list_display = ('purchase_id', 'product', 'quantity', 'unit_cost_bdt', 'total_cost_bdt', 'supplier_name', 'entry_by', 'purchase_date')
-    search_fields = ('purchase_id', 'product__product_name', 'invoice_number', 'supplier_name')
-    list_filter = ('purchase_date', 'entry_by')
-    readonly_fields = ('purchase_id', 'total_cost_bdt', 'purchase_date')
+class PurchaseItemInline(admin.TabularInline):
+    model = PurchaseItem
+    extra = 1
+    readonly_fields = ('total_cost_bdt',)
 
-admin.site.register(Purchase, PurchaseAdmin)
+@admin.register(PurchaseOrder)
+class PurchaseOrderAdmin(admin.ModelAdmin):
+    # Only show the relevant data
+    list_display = ('po_number', 'supplier', 'total_amount', 'payment_status', 'purchase_date')
+    search_fields = ('po_number', 'supplier__name')
+    list_filter = ('payment_status',)
+    
+    readonly_fields = ('po_number', 'total_amount')
+    inlines = [PurchaseItemInline]

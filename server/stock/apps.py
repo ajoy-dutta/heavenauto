@@ -5,5 +5,4 @@ class StockConfig(AppConfig):
     name = 'stock'
 
     def ready(self):
-        # This tells Django to listen to our automation rules when the server starts
-        import stock.signals
+        import stock.signals # This wakes up the automation!

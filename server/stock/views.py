@@ -2,7 +2,7 @@ from rest_framework import viewsets
 from .models import Stock
 from .serializers import StockSerializer
 
-class StockViewSet(viewsets.ReadOnlyModelViewSet):
-    # Notice we use ReadOnlyModelViewSet so no one can POST directly to stock
+# Use ReadOnlyModelViewSet so React can ONLY GET stock data, not POST/PUT
+class StockViewSet(viewsets.ReadOnlyModelViewSet): 
     queryset = Stock.objects.all().order_by('product__product_name')
     serializer_class = StockSerializer

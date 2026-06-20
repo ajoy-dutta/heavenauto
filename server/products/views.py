@@ -6,19 +6,21 @@ from rest_framework.parsers import MultiPartParser, FormParser
 
 from .models import Product
 from .serializers import ProductSerializer
+from brand.models import Brand  # <-- Added the Brand model import
 
-# --- 1. Standard CRUD ViewSet (Your existing view) ---
+# --- 1. Standard CRUD ViewSet ---
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
-
 
 # --- 2. New Bulk Excel Import View ---
 class BulkProductImportView(APIView):
     parser_classes = (MultiPartParser, FormParser)
 
     def post(self, request, *args, **kwargs):
-        file = request.FILES.get('excel_file')
+        # Ensure this matches what your React frontend sends (usually 'file' or 'excel_file')
+        file = request.FILES.get('excel_file') or request.FILES.get('file') 
+        
         if not file:
             return Response({"error": "No file uploaded"}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -33,14 +35,23 @@ class BulkProductImportView(APIView):
             for index, row in df.iterrows():
                 # Skip if part_number or barcode already exists to prevent duplicate crashes
                 if Product.objects.filter(part_number=row.get('part_number')).exists() or \
-                   Product.objects.filter(barcode=row.get('barcode')).exists():
+                   (row.get('barcode') and Product.objects.filter(barcode=row.get('barcode')).exists()):
                     continue
                 
+                # --- AUTOMATIC BRAND CREATION LOGIC ---
+                brand_name = str(row.get('brand', '')).strip()
+                brand_obj = None
+                
+                # If a brand name exists in Excel, find it in the DB or create it on the fly
+                if brand_name and brand_name.lower() not in ['nan', 'none', '']:
+                    brand_obj, created = Brand.objects.get_or_create(name=brand_name)
+                # --------------------------------------
+
                 # Map Excel columns to Django Model fields
                 product = Product(
                     part_number=row.get('part_number'),
                     product_name=row.get('product_name'),
-                    brand=row.get('brand', ''),
+                    brand=brand_obj,  # <-- Link the resolved object instead of raw text
                     category=row.get('category', ''),
                     source=row.get('source', 'Local'),
                     hs_code=row.get('hs_code', ''),

@@ -1,4 +1,5 @@
 from django.db import models
+from brand.models import Brand
 import uuid
 
 class Product(models.Model):
@@ -6,7 +7,7 @@ class Product(models.Model):
     product_id = models.CharField(max_length=20, unique=True, editable=False, help_text="Auto-generated system ID")
     part_number = models.CharField(max_length=100, unique=True, help_text="Manufacturer's part number (Primary Identifier)")
     product_name = models.CharField(max_length=255, help_text="Full descriptive name")
-    brand = models.CharField(max_length=100, help_text="Brand (Honda, Yamaha, Bajaj, etc.)")
+    brand = models.ForeignKey(Brand, on_delete=models.SET_NULL, null=True, blank=True, related_name='products', help_text="Select the Brand (e.g., Yamaha, Suzuki)")
     category = models.CharField(max_length=100, help_text="Category > Sub-Category hierarchy")
 
     # --- 2. Sourcing & Import Details ---

@@ -2,9 +2,9 @@ from django.db import models
 from products.models import Product
 
 class Stock(models.Model):
-    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='stock_record')
-    current_quantity = models.IntegerField(default=0, help_text="Current available stock in warehouse")
+    product = models.OneToOneField(Product, on_delete=models.CASCADE, related_name='inventory_stock')
+    current_quantity = models.IntegerField(default=0)
     last_updated = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"Stock: {self.product.product_name} - {self.current_quantity} pcs"
+        return f"{self.product.product_name}: {self.current_quantity} in stock"
