@@ -30,7 +30,7 @@ export default function EmployeeList() {
 
   const fetchEmployees = async () => {
     try {
-      const response = await axiosInstance.get("employees/");
+      const response = await axiosInstance.get("person/employees/");
       setEmployees(response.data);
       setLoading(false);
     } catch (err) {

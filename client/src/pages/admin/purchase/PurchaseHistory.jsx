@@ -1,20 +1,21 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiPlus, FiBox, FiSearch, FiEdit, FiX, FiSave, FiTrash2 } from "react-icons/fi";
+import { FiPlus, FiBox, FiSearch, FiEdit, FiX, FiSave, FiTrash2, FiEye } from "react-icons/fi";
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
-  const [products, setProducts] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
   const [employees, setEmployees] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Edit Modal State
+  // Edit/View Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState(null);
+  const [selectedItems, setSelectedItems] = useState([]); // To display nested items
   const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
@@ -23,38 +24,33 @@ export default function PurchaseHistory() {
 
   const fetchData = async () => {
     try {
-      // Fetch purchases, products, and employees concurrently for the edit dropdowns
-      const [purRes, prodRes, empRes] = await Promise.all([
-        axiosInstance.get("purchases/"),
-        axiosInstance.get("products/"),
-        axiosInstance.get("employees/")
+      // Fetch purchases, suppliers, and employees
+      const [purRes, supRes, empRes] = await Promise.all([
+        axiosInstance.get("purchase/purchases/"),
+        axiosInstance.get("supplier/suppliers/"),
+        axiosInstance.get("person/employees/")
       ]);
-      setPurchases(purRes.data);
-      setProducts(prodRes.data);
-      setEmployees(empRes.data);
+      setPurchases(purRes.data.results || purRes.data);
+      setSuppliers(supRes.data.results || supRes.data);
+      setEmployees(empRes.data.results || empRes.data);
       setLoading(false);
     } catch (err) {
-      setError("Failed to fetch data.");
+      setError("Failed to fetch purchase data.");
       setLoading(false);
     }
   };
 
-  // --- EDIT FUNCTIONALITY ---
+  // --- EDIT / VIEW FUNCTIONALITY ---
   const openEditModal = (purchase) => {
     setEditFormData({
       id: purchase.id,
-      product: purchase.product || "",
+      supplier: purchase.supplier || "",
       entry_by: purchase.entry_by || "",
-      quantity: purchase.quantity || "",
-      unit_cost_bdt: purchase.unit_cost_bdt || "",
-      discount_amount: purchase.discount_amount || "",
-      paid_amount: purchase.paid_amount || "",
-      supplier_name: purchase.supplier_name || "",
       invoice_number: purchase.invoice_number || "",
       remarks: purchase.remarks || "",
-      payment_status: purchase.payment_status || "",
-      payment_method: purchase.payment_method || "",
+      po_number: purchase.po_number
     });
+    setSelectedItems(purchase.items || []);
     setIsEditModalOpen(true);
   };
 
@@ -62,151 +58,143 @@ export default function PurchaseHistory() {
     setEditFormData({ ...editFormData, [e.target.name]: e.target.value });
   };
 
-  // Real-time calculations for the modal
-  const qty = parseFloat(editFormData?.quantity) || 0;
-  const unitCost = parseFloat(editFormData?.unit_cost_bdt) || 0;
-  const discount = parseFloat(editFormData?.discount_amount) || 0;
-  const paid = parseFloat(editFormData?.paid_amount) || 0;
-
-  const totalCost = qty * unitCost;
-  const totalAfterDiscount = Math.max(0, totalCost - discount);
-  const payableAmount = totalAfterDiscount;
-  const dueAmount = Math.max(0, payableAmount - paid);
-
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditLoading(true);
 
-    const payload = {
-      ...editFormData,
-      total_cost_bdt: totalCost,
-      payable_amount: payableAmount,
-      due_amount: dueAmount
-    };
-
     try {
-      await axiosInstance.put(`purchases/${editFormData.id}/`, payload);
+      // We use PATCH to only update the header info (invoice, remarks, supplier)
+      await axiosInstance.patch(`purchase/purchases/${editFormData.id}/`, editFormData);
       fetchData(); // Refresh the list
       setIsEditModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.detail || "Failed to update purchase.");
+      alert(err.response?.data?.detail || "Failed to update purchase order.");
     } finally {
       setEditLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to permanently delete this purchase record? This will deduct from your stock!")) {
+    if (window.confirm("Are you sure you want to permanently delete this PO? This will deduct the products from your stock!")) {
       try {
-        await axiosInstance.delete(`purchases/${id}/`);
+        await axiosInstance.delete(`purchase/purchases/${id}/`);
         fetchData();
       } catch (err) {
-        alert("Failed to delete purchase.");
+        alert("Failed to delete purchase. Check server logs.");
       }
     }
   };
 
+  // Helper to get Supplier Name
+  const getSupplierName = (id) => {
+    const sup = suppliers.find(s => String(s.id) === String(id));
+    return sup ? (sup.name || sup.company_name) : "Unknown Supplier";
+  };
+
   // Filter purchases
-  const filteredPurchases = purchases.filter((p) =>
-    `${p.purchase_id} ${p.invoice_number} ${p.supplier_name} ${p.product_name}`
-      .toLowerCase()
-      .includes(searchTerm.toLowerCase())
-  );
+  const filteredPurchases = purchases.filter((p) => {
+    const supName = getSupplierName(p.supplier).toLowerCase();
+    const productNames = p.items ? p.items.map(i => i.product_name).join(" ").toLowerCase() : "";
+    const search = searchTerm.toLowerCase();
+
+    return (
+      (p.po_number && p.po_number.toLowerCase().includes(search)) ||
+      (p.invoice_number && p.invoice_number.toLowerCase().includes(search)) ||
+      supName.includes(search) ||
+      productNames.includes(search)
+    );
+  });
 
   return (
-    <div className="p-6 text-gray-100 relative">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+    <div className="p-4 md:p-6 text-gray-800 bg-gray-50 min-h-screen">
+      
+      {/* HEADER */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FiBox className="text-blue-500" /> Purchase History
+          <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
+            <FiBox className="text-blue-600" /> Purchase History
           </h1>
-          <p className="text-sm text-gray-400">Track and edit incoming stock and supplier invoices.</p>
+          <p className="text-sm text-gray-500">Track incoming shipments and PO records.</p>
         </div>
         <Link
           to="/dashboard/purchase/add"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition flex items-center gap-2 text-sm shadow-sm"
         >
-          <FiPlus /> Add New Purchase
+          <FiPlus /> New Purchase
         </Link>
       </div>
 
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-lg">
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
+        
         {/* Search Bar */}
-        <div className="p-4 border-b border-gray-700 flex items-center gap-2">
-          <FiSearch className="text-gray-400 text-xl" />
+        <div className="p-3 border-b border-gray-200 flex items-center gap-2 bg-gray-50/50">
+          <FiSearch className="text-gray-400" />
           <input
             type="text"
-            placeholder="Search by ID, Product, Invoice, or Supplier..."
-            className="w-full bg-transparent text-white focus:outline-none placeholder-gray-500"
+            placeholder="Search by PO Number, Product, Invoice, or Supplier..."
+            className="w-full bg-transparent text-sm text-gray-800 focus:outline-none placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-400 animate-pulse">Loading records...</div>
+          <div className="p-8 text-center text-gray-500 text-sm font-medium animate-pulse">Loading records...</div>
         ) : error ? (
-          <div className="p-8 text-center text-red-400">{error}</div>
+          <div className="p-8 text-center text-red-500 text-sm font-medium">{error}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-900 text-gray-400 text-sm uppercase tracking-wider">
-                  <th className="p-4 font-semibold">Date & ID</th>
-                  <th className="p-4 font-semibold">Product</th>
-                  <th className="p-4 font-semibold">Supplier & Invoice</th>
-                  <th className="p-4 font-semibold text-right">Qty</th>
-                  <th className="p-4 font-semibold text-right">Total Cost (BDT)</th>
-                  <th className="p-4 font-semibold text-center">Actions</th>
+            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+              <thead className="bg-gray-100 text-gray-600 border-b border-gray-200">
+                <tr>
+                  <th className="p-3 font-bold">PO & Date</th>
+                  <th className="p-3 font-bold">Supplier Info</th>
+                  <th className="p-3 font-bold">Items Summary</th>
+                  <th className="p-3 font-bold text-right">Total Amount (৳)</th>
+                  <th className="p-3 font-bold text-center">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-700">
+              <tbody className="divide-y divide-gray-100">
                 {filteredPurchases.length > 0 ? (
                   filteredPurchases.map((purchase) => (
-                    <tr key={purchase.id} className="hover:bg-gray-750 transition">
-                      <td className="p-4">
-                        <div className="font-semibold text-blue-400">{purchase.purchase_id}</div>
-                        <div className="text-xs text-gray-400">
+                    <tr key={purchase.id} className="hover:bg-blue-50/50 transition">
+                      <td className="p-3">
+                        <div className="font-bold text-blue-600">{purchase.po_number}</div>
+                        <div className="text-xs text-gray-500">
                           {new Date(purchase.purchase_date).toLocaleDateString()}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="font-medium text-gray-200">
-                          {purchase.product_name || `Product ID: ${purchase.product}`}
-                        </div>
-                        <div className="text-xs text-gray-500">By: {purchase.entry_by_name}</div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-gray-300">{purchase.supplier_name || "N/A"}</div>
+                      <td className="p-3">
+                        <div className="font-semibold text-gray-800">{getSupplierName(purchase.supplier)}</div>
                         <div className="text-xs text-gray-500">Inv: {purchase.invoice_number || "N/A"}</div>
                       </td>
-                      <td className="p-4 text-right font-bold text-gray-200">
-                        {purchase.quantity}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="font-bold text-green-400">
-                          ৳ {parseFloat(purchase.total_cost_bdt).toLocaleString()}
+                      <td className="p-3">
+                        <div className="font-medium text-gray-700">
+                          {purchase.items?.length || 0} Products
                         </div>
-                        <div className="text-xs text-gray-500">
-                          (৳ {parseFloat(purchase.unit_cost_bdt).toLocaleString()} / unit)
+                        <div className="text-xs text-gray-500 truncate max-w-[200px]" title={purchase.items?.map(i => i.product_name).join(', ')}>
+                          {purchase.items?.map(i => i.product_name).join(', ')}
                         </div>
                       </td>
-                      <td className="p-4 text-center">
+                      <td className="p-3 text-right font-bold text-gray-900">
+                        {parseFloat(purchase.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-3 text-center">
                         <div className="flex justify-center items-center gap-3">
                           <button 
                             onClick={() => openEditModal(purchase)}
-                            className="text-blue-400 hover:text-blue-300 transition"
-                            title="Edit Record"
+                            className="text-blue-500 hover:text-blue-700 transition flex items-center gap-1 font-semibold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-100"
+                            title="View / Edit Record"
                           >
-                            <FiEdit size={18} />
+                            <FiEye /> View
                           </button>
                           <button 
                             onClick={() => handleDelete(purchase.id)}
-                            className="text-red-500 hover:text-red-400 transition"
+                            className="text-red-500 hover:text-red-700 transition"
                             title="Delete Record"
                           >
-                            <FiTrash2 size={18} />
+                            <FiTrash2 size={16} />
                           </button>
                         </div>
                       </td>
@@ -214,7 +202,7 @@ export default function PurchaseHistory() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="6" className="p-8 text-center text-gray-500">
+                    <td colSpan="5" className="p-8 text-center text-gray-500 text-sm">
                       No purchase records found.
                     </td>
                   </tr>
@@ -225,213 +213,120 @@ export default function PurchaseHistory() {
         )}
       </div>
 
-      {/* --- ADVANCED EDIT MODAL --- */}
+      {/* --- DETAILS / EDIT MODAL --- */}
       {isEditModalOpen && editFormData && (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex justify-center items-center z-50 p-4">
-          <div className="bg-gray-800 rounded-xl border border-gray-700 w-full max-w-4xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-lg border border-gray-200 w-full max-w-4xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
             
             {/* Modal Header */}
-            <div className="flex justify-between items-center p-5 border-b border-gray-700 bg-gray-900 shrink-0">
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <FiEdit className="text-blue-500" /> Edit Full Purchase Record
-              </h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-white transition">
+            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 shrink-0">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                  <FiBox className="text-blue-600" /> {editFormData.po_number}
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">View products and update order header.</p>
+              </div>
+              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-red-500 transition">
                 <FiX size={24} />
               </button>
             </div>
 
             {/* Modal Body (Scrollable) */}
-            <div className="p-6 overflow-y-auto custom-scrollbar space-y-6">
-              <form id="editForm" onSubmit={handleEditSubmit} className="space-y-6">
-                
-                {/* Row 1: Products and Entry */}
+            <div className="p-4 overflow-y-auto space-y-6">
+              
+              {/* Product Details (Read Only) */}
+              <div>
+                <h3 className="text-sm font-bold text-gray-700 mb-2 border-b pb-1">Products Received</h3>
+                <div className="border border-gray-200 rounded overflow-hidden">
+                  <table className="w-full text-left text-sm whitespace-nowrap">
+                    <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+                      <tr>
+                        <th className="p-2 font-semibold">Product</th>
+                        <th className="p-2 font-semibold text-right">Qty</th>
+                        <th className="p-2 font-semibold text-right">Unit Cost</th>
+                        <th className="p-2 font-semibold text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedItems.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="p-2 text-gray-800 font-medium">{item.product_name}</td>
+                          <td className="p-2 text-right">{item.quantity}</td>
+                          <td className="p-2 text-right">৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}</td>
+                          <td className="p-2 text-right font-bold text-gray-700">৳ {parseFloat(item.total_cost_bdt).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Editable Header Form */}
+              <form id="editForm" onSubmit={handleEditSubmit}>
+                <h3 className="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Order Logistics</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Product</label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Supplier</label>
                     <select
-                      name="product"
-                      value={editFormData.product}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
+                      name="supplier" required value={editFormData.supplier} onChange={handleEditChange}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     >
-                      <option value="">Select Product</option>
-                      {products.map(p => (
-                        <option key={p.id} value={p.id}>{p.product_name}</option>
-                      ))}
+                      <option value="">Select Supplier</option>
+                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name || s.company_name}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Entry By</label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Entry By</label>
                     <select
-                      name="entry_by"
-                      value={editFormData.entry_by}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
+                      name="entry_by" value={editFormData.entry_by} onChange={handleEditChange}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     >
                       <option value="">Select Employee</option>
-                      {employees.map(e => (
-                        <option key={e.id} value={e.id}>{e.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: Core Cost & Quantity */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Quantity *</label>
-                    <input
-                      type="number"
-                      name="quantity"
-                      required
-                      min="1"
-                      value={editFormData.quantity}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Unit Cost (BDT) *</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="unit_cost_bdt"
-                      required
-                      value={editFormData.unit_cost_bdt}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-400 mb-1">Total Cost</label>
-                    <div className="w-full bg-gray-700/50 border border-gray-600 rounded p-2 text-gray-300 font-mono">
-                      ৳ {totalCost.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 3: Discounts & Payments */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-900/40 p-4 rounded-lg border border-gray-700">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Discount Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="discount_amount"
-                      value={editFormData.discount_amount}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Paid Amount</label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      name="paid_amount"
-                      value={editFormData.paid_amount}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-red-400 mb-1">Calculated Due</label>
-                    <div className="w-full bg-red-900/20 border border-red-800 rounded p-2 text-red-400 font-bold font-mono">
-                      ৳ {dueAmount.toFixed(2)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Row 4: Status & Details */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Status</label>
-                    <select
-                      name="payment_status"
-                      value={editFormData.payment_status}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    >
-                      <option value="">Status</option>
-                      <option value="Paid">Paid</option>
-                      <option value="Partial">Partial</option>
-                      <option value="Unpaid">Unpaid</option>
+                      {employees.map(e => <option key={e.id} value={e.id}>{e.name || e.employee_id}</option>)}
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Method</label>
-                    <select
-                      name="payment_method"
-                      value={editFormData.payment_method}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                    >
-                      <option value="">Method</option>
-                      <option value="Cash">Cash</option>
-                      <option value="Bank">Bank</option>
-                      <option value="Mobile">Mobile</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-1">Supplier</label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Invoice Number</label>
                     <input
-                      type="text"
-                      name="supplier_name"
-                      value={editFormData.supplier_name}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
+                      type="text" name="invoice_number" value={editFormData.invoice_number} onChange={handleEditChange}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm text-gray-400 mb-1">Invoice</label>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Remarks / Notes</label>
                     <input
-                      type="text"
-                      name="invoice_number"
-                      value={editFormData.invoice_number}
-                      onChange={handleEditChange}
-                      className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
+                      type="text" name="remarks" value={editFormData.remarks} onChange={handleEditChange}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     />
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-400 mb-1">Remarks</label>
-                  <input
-                    type="text"
-                    name="remarks"
-                    value={editFormData.remarks}
-                    onChange={handleEditChange}
-                    className="w-full bg-gray-900 border border-gray-600 rounded p-2 text-white focus:border-blue-500 outline-none"
-                  />
                 </div>
               </form>
             </div>
 
-            {/* Modal Footer (Fixed at bottom) */}
-            <div className="p-5 border-t border-gray-700 bg-gray-900 flex justify-end gap-3 shrink-0">
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 rounded font-medium text-gray-400 hover:text-white hover:bg-gray-700 transition"
+                className="px-4 py-2 rounded text-sm font-bold text-gray-600 hover:bg-gray-200 transition"
               >
-                Cancel
+                Close
               </button>
               <button
                 form="editForm"
                 type="submit"
                 disabled={editLoading}
-                className={`px-5 py-2 rounded font-bold text-white transition flex items-center gap-2 ${
-                  editLoading ? "bg-blue-800 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-500"
+                className={`px-5 py-2 rounded text-sm font-bold text-white transition flex items-center gap-2 ${
+                  editLoading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
-                <FiSave /> {editLoading ? "Saving..." : "Update Full Record"}
+                <FiSave /> {editLoading ? "Saving..." : "Update Logistics"}
               </button>
             </div>
 
           </div>
         </div>
       )}
-
     </div>
   );
 }

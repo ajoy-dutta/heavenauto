@@ -62,12 +62,12 @@ export default function AddEmployee() {
 
     try {
       if (isEditMode) {
-        await axiosInstance.patch(`employees/${editData.id}/`, submitData, {
+        await axiosInstance.patch(`person/employees/${editData.id}/`, submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         alert("Employee successfully updated!");
       } else {
-        await axiosInstance.post("employees/", submitData, {
+        await axiosInstance.post("person/employees/", submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         alert("Employee successfully added!");

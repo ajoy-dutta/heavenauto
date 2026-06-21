@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiSave, FiArrowLeft, FiLayers, FiDollarSign, FiBox, FiTruck, FiAlertCircle, FiImage, FiUpload } from "react-icons/fi";
+import { FiSave, FiArrowLeft, FiUpload } from "react-icons/fi";
 
 export default function AddProduct() {
   const { id } = useParams();
@@ -9,6 +9,7 @@ export default function AddProduct() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
+  // Matches the complete Django model
   const [formData, setFormData] = useState({
     part_number: "", product_name: "", brand: "", category: "", source: "Local",
     hs_code: "", mrp_inr: 0, mrp_bdt: 0, purchase_cost_bdt: 0, markup_percentage: 0,
@@ -19,47 +20,66 @@ export default function AddProduct() {
     image_1: null, image_2: null, image_3: null, image_4: null, image_5: null,
   });
 
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [fetchingData, setFetchingData] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
+    fetchBrands();
     if (isEditMode) fetchExistingProduct();
   }, [id]);
+
+  // SAFELY fetch brands to prevent .map crashes
+  const fetchBrands = async () => {
+    try {
+      const response = await axiosInstance.get("brand/brands/");
+      const data = response.data;
+      
+      if (Array.isArray(data)) {
+        setBrands(data);
+      } else if (data && Array.isArray(data.results)) {
+        setBrands(data.results);
+      } else if (data && Array.isArray(data.data)) { 
+        setBrands(data.data);
+      } else {
+        setBrands([]); 
+      }
+    } catch (err) {
+      console.error("Failed to load brands", err);
+      setBrands([]); 
+    }
+  };
 
   const fetchExistingProduct = async () => {
     setFetchingData(true);
     try {
       const response = await axiosInstance.get(`products/${id}/`);
-      const data = response.data;
       setFormData({
-        ...data,
-        image_1: null, image_2: null, image_3: null, image_4: null, image_5: null,
+        ...response.data,
+        image_1: null, image_2: null, image_3: null, image_4: null, image_5: null, // Clear files
       });
       setFetchingData(false);
     } catch (err) {
-      setError("Failed to load product details for editing.");
+      setError("Failed to load product details.");
       setFetchingData(false);
     }
   };
 
   const handleChange = (e) => {
     const { name, value, type, files } = e.target;
-    if (type === "file") {
-      setFormData((prev) => ({ ...prev, [name]: files[0] }));
-    } else {
-      setFormData((prev) => ({ ...prev, [name]: value }));
-    }
+    setFormData((prev) => ({
+      ...prev,
+      [name]: type === "file" ? files[0] : value
+    }));
   };
 
   const handleExcelImport = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const importData = new FormData();
     importData.append("excel_file", file);
-
     setImporting(true);
     setError("");
 
@@ -70,8 +90,7 @@ export default function AddProduct() {
       alert(response.data.message);
       navigate("/dashboard/products");
     } catch (err) {
-      console.error(err);
-      setError("Failed to import Excel. Ensure your column names match the system exactly.");
+      setError("Excel Import Failed. Check column names.");
     } finally {
       setImporting(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -98,161 +117,116 @@ export default function AddProduct() {
       }
       navigate("/dashboard/products");
     } catch (err) {
-      console.error(err.response?.data);
-      setError("Error processing data. Check if part number or barcode is already in use.");
+      setError(err.response?.data?.detail || "Error saving product. Check unique fields (part number, barcode).");
       setLoading(false);
     }
   };
 
-  if (fetchingData) return ( <div className="flex justify-center items-center h-64 text-gray-600"><div className="animate-spin rounded-full h-8 w-8 border-t-2 border-indigo-600 mr-2"></div><span>Retrieving part records...</span></div> );
+  if (fetchingData) return <div className="p-4 text-center text-gray-500">Loading master record...</div>;
 
-  // Adjusted classes for better mobile touch targets and visual padding
-  const inputClass = "w-full p-3 sm:p-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-sm transition-shadow";
-  const labelClass = "block text-xs font-bold text-gray-600 uppercase mb-1.5 tracking-wider";
-  const fileInputClass = "w-full p-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none text-sm shadow-sm file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition";
+  // Ultra-compact styling classes
+  const inputClass = "w-full px-2 py-1 text-sm bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-800 transition-colors";
+  const labelClass = "block text-[10px] font-bold text-gray-500 uppercase tracking-tight mb-0.5";
+  const sectionHeaderClass = "col-span-full text-xs font-bold text-gray-800 border-b border-gray-200 mt-2 pb-1 mb-1 uppercase tracking-wider";
 
   return (
-    <div className="bg-white text-gray-900 p-4 sm:p-6 rounded-xl shadow-md border border-gray-200 max-w-5xl mx-auto mb-10 w-full">
+    <div className="bg-white text-gray-900 p-3 sm:p-4 rounded shadow-sm border border-gray-200 max-w-7xl mx-auto w-full">
       
-      {/* Mobile-Responsive Header: Stacks on small screens, spreads on large */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 border-b border-gray-200 pb-4 mb-6">
-        <button onClick={() => navigate("/dashboard/products")} className="flex items-center gap-2 text-gray-500 hover:text-indigo-600 transition text-sm font-medium">
-          <FiArrowLeft /> Back to Inventory
-        </button>
-        <h2 className="text-xl font-bold tracking-tight text-gray-800 text-left sm:text-right">
-          {isEditMode ? "🔧 Modify Master Part Record" : "📦 Register New Warehouse Part"}
-        </h2>
-      </div>
-
-      {error && <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded mb-6 text-sm">{error}</div>}
-
-      <form onSubmit={handleSubmit} className="space-y-6 sm:space-y-8">
-        
-        {/* Section 1: Core Part Identity */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-indigo-700 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiLayers /> 1. Core Identification
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-            <div><label className={labelClass}>Part Number *</label><input type="text" name="part_number" required value={formData.part_number} onChange={handleChange} className={inputClass} /></div>
-            <div className="md:col-span-2"><label className={labelClass}>Product Name *</label><input type="text" name="product_name" required value={formData.product_name} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Brand</label><input type="text" name="brand" value={formData.brand} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Category</label><input type="text" name="category" value={formData.category} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Barcode (EAN-13)</label><input type="text" name="barcode" required value={formData.barcode} onChange={handleChange} className={`${inputClass} font-mono bg-gray-50`} /></div>
-          </div>
+      {/* Top Header & Actions Toolbar */}
+      <div className="flex flex-col sm:flex-row justify-between items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate("/dashboard/products")} className="text-gray-400 hover:text-gray-800 transition">
+            <FiArrowLeft size={18} />
+          </button>
+          <h2 className="text-lg font-bold tracking-tight text-gray-800 leading-none">
+            {isEditMode ? "Edit Part Record" : "New Warehouse Part"}
+          </h2>
         </div>
 
-        {/* Section 2: Sourcing & Logistics */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-blue-700 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiTruck /> 2. Sourcing & Logistics
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
-            <div>
-              <label className={labelClass}>Source Origin</label>
-              <select name="source" value={formData.source} onChange={handleChange} className={inputClass}>
-                <option value="Local">Local Purchase</option>
-                <option value="Import">Import (India)</option>
-              </select>
-            </div>
-            <div><label className={labelClass}>Customs HS Code</label><input type="text" name="hs_code" value={formData.hs_code} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Primary Unit</label><input type="text" name="unit" value={formData.unit} onChange={handleChange} placeholder="piece, box, set" className={inputClass} /></div>
-            <div><label className={labelClass}>Alternative Units</label><input type="text" name="alternative_units" value={formData.alternative_units} onChange={handleChange} placeholder="1 box = 12 pcs" className={inputClass} /></div>
-          </div>
-        </div>
-
-        {/* Section 3: Financial Valuation & Pricing */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-emerald-700 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiDollarSign /> 3. Pricing Rules (BDT & INR)
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-            {/* FIXED: Changed from strict grid-cols-3 to mobile-first grid-cols-1 sm:grid-cols-3 */}
-            <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5 border-b border-gray-300 pb-5 mb-1">
-              <div><label className={labelClass}>Purchasing Cost (BDT) *</label><input type="number" step="0.01" name="purchase_cost_bdt" required value={formData.purchase_cost_bdt} onChange={handleChange} className={inputClass} /></div>
-              <div><label className={labelClass}>Wholesale Sale (BDT) *</label><input type="number" step="0.01" name="wholesale_price_bdt" required value={formData.wholesale_price_bdt} onChange={handleChange} className={inputClass} /></div>
-              <div><label className={labelClass}>Retail Sale (BDT) *</label><input type="number" step="0.01" name="retail_price_bdt" required value={formData.retail_price_bdt} onChange={handleChange} className={inputClass} /></div>
-            </div>
-
-            {formData.source === "Import" && (
-              <>
-                <div><label className="block text-xs font-bold text-indigo-700 uppercase mb-1.5 tracking-wider">Indian MRP (INR)</label><input type="number" step="0.01" name="mrp_inr" value={formData.mrp_inr} onChange={handleChange} className={inputClass} /></div>
-                <div><label className="block text-xs font-bold text-indigo-700 uppercase mb-1.5 tracking-wider">Markup Percentage (%)</label><input type="number" step="0.01" name="markup_percentage" value={formData.markup_percentage} onChange={handleChange} className={inputClass} /></div>
-                <div><label className="block text-xs font-bold text-indigo-700 uppercase mb-1.5 tracking-wider">Converted MRP (BDT)</label><input type="number" step="0.01" name="mrp_bdt" value={formData.mrp_bdt} onChange={handleChange} className={`${inputClass} bg-indigo-50`} /></div>
-              </>
-            )}
-          </div>
-        </div>
-
-        {/* Section 4: Warehouse Alerts & Status */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-amber-600 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiBox /> 4. Stock Triggers & Status
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 sm:gap-5">
-            <div><label className={labelClass}>Min Stock Alert</label><input type="number" name="min_stock_level" value={formData.min_stock_level} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Auto-Reorder Point</label><input type="number" name="reorder_point" value={formData.reorder_point} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Max Overstock Limit</label><input type="number" name="max_stock_level" value={formData.max_stock_level} onChange={handleChange} className={inputClass} /></div>
-            <div>
-              <label className={labelClass}>Product Status</label>
-              <select name="product_status" value={formData.product_status} onChange={handleChange} className={inputClass}>
-                <option value="Active">Active</option>
-                <option value="Discontinued">Discontinued</option>
-                <option value="Seasonal">Seasonal</option>
-                <option value="Damaged">Damaged / Slow Moving</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Section 5: Specs & Exceptions */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-red-600 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiAlertCircle /> 5. Taxes, Warranty & Exceptions
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
-            <div><label className={labelClass}>VAT Code</label><input type="text" name="vat_code" value={formData.vat_code} onChange={handleChange} className={inputClass} /></div>
-            <div><label className={labelClass}>Warranty (Months)</label><input type="number" name="warranty_period" value={formData.warranty_period} onChange={handleChange} className={inputClass} /></div>
-            <div className="md:col-span-2"><label className={labelClass}>Vehicle Compatibility</label><textarea name="vehicle_compatibility" value={formData.vehicle_compatibility} onChange={handleChange} rows="2" placeholder="e.g., Honda CB 125 (2018-2024)" className={inputClass}></textarea></div>
-          </div>
-        </div>
-
-        {/* Section 6: Product Images */}
-        <div className="bg-gray-50 p-4 sm:p-5 rounded-lg border border-gray-200 space-y-4">
-          <h3 className="text-gray-700 font-bold text-sm uppercase tracking-wider flex items-center gap-2">
-            <FiImage /> 6. Product Media (Upload up to 5 images)
-          </h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5">
-            <div><label className={labelClass}>Primary Image 1</label><input type="file" accept="image/*" name="image_1" onChange={handleChange} className={fileInputClass} /></div>
-            <div><label className={labelClass}>Image 2</label><input type="file" accept="image/*" name="image_2" onChange={handleChange} className={fileInputClass} /></div>
-            <div><label className={labelClass}>Image 3</label><input type="file" accept="image/*" name="image_3" onChange={handleChange} className={fileInputClass} /></div>
-            <div><label className={labelClass}>Image 4</label><input type="file" accept="image/*" name="image_4" onChange={handleChange} className={fileInputClass} /></div>
-            <div><label className={labelClass}>Image 5</label><input type="file" accept="image/*" name="image_5" onChange={handleChange} className={fileInputClass} /></div>
-          </div>
-        </div>
-
-        {/* --- Action Commit Buttons (Mobile Optimized) --- */}
-        {/* FIXED: Flex changes to a column on mobile to stack the buttons nicely, and stretches them full width */}
-        <div className="flex flex-col-reverse sm:flex-row justify-between items-stretch sm:items-center gap-4 pt-4">
-          
-          <input 
-            type="file" 
-            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, .csv, .xlsx, .xls" 
-            ref={fileInputRef} 
-            onChange={handleExcelImport} 
-            className="hidden" 
-          />
-
-          {!isEditMode ? (
-            <button type="button" onClick={() => fileInputRef.current.click()} disabled={importing || loading} className="flex justify-center items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3.5 sm:py-3 rounded-lg shadow transition-all w-full sm:w-auto">
-              <FiUpload /> {importing ? "Importing Data..." : "Bulk Import via Excel"}
+        <div className="flex gap-2 w-full sm:w-auto">
+          <input type="file" accept=".csv, .xlsx, .xls" ref={fileInputRef} onChange={handleExcelImport} className="hidden" />
+          {!isEditMode && (
+            <button type="button" onClick={() => fileInputRef.current.click()} disabled={importing || loading} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold px-3 py-1.5 rounded transition">
+              <FiUpload size={14} /> {importing ? "Importing..." : "Excel Import"}
             </button>
-          ) : <div className="hidden sm:block"></div>}
-
-          <button type="submit" disabled={loading || importing} className="flex justify-center items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold px-8 py-3.5 sm:py-3 rounded-lg shadow hover:shadow-lg transition-all w-full sm:w-auto">
-            <FiSave /> {loading ? "Saving System Records..." : isEditMode ? "Update Master Record" : "Commit Part To Warehouse"}
+          )}
+          <button onClick={handleSubmit} disabled={loading || importing} className="flex-1 sm:flex-none flex justify-center items-center gap-1.5 bg-gray-800 hover:bg-black text-white text-xs font-bold px-4 py-1.5 rounded shadow-sm transition">
+            <FiSave size={14} /> {loading ? "Saving..." : "Save Product"}
           </button>
         </div>
+      </div>
+
+      {error && <div className="bg-red-50 text-red-600 p-2 rounded mb-3 text-xs border border-red-100">{error}</div>}
+
+      <form className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-x-3 gap-y-2" onSubmit={handleSubmit}>
+        
+        {/* Core Identification */}
+        <div className={sectionHeaderClass}>1. Identity</div>
+        <div className="col-span-1"><label className={labelClass}>Part Number *</label><input type="text" name="part_number" required value={formData.part_number} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-2"><label className={labelClass}>Product Name *</label><input type="text" name="product_name" required value={formData.product_name} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1">
+          <label className={labelClass}>Brand</label>
+          <select name="brand" value={formData.brand} onChange={handleChange} className={inputClass}>
+            <option value="">Select Brand...</option>
+            {/* SAFELY MAP BRANDS */}
+            {Array.isArray(brands) && brands.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+        <div className="col-span-1"><label className={labelClass}>Category</label><input type="text" name="category" value={formData.category} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Barcode</label><input type="text" name="barcode" required value={formData.barcode} onChange={handleChange} className={`${inputClass} font-mono`} /></div>
+
+        {/* Pricing & Sourcing */}
+        <div className={sectionHeaderClass}>2. Pricing & Sourcing</div>
+        <div className="col-span-1">
+          <label className={labelClass}>Source</label>
+          <select name="source" value={formData.source} onChange={handleChange} className={inputClass}>
+            <option value="Local">Local Purchase</option>
+            <option value="Import">Import (India)</option>
+          </select>
+        </div>
+        <div className="col-span-1"><label className={labelClass}>Purch. Cost (BDT) *</label><input type="number" step="0.01" name="purchase_cost_bdt" required value={formData.purchase_cost_bdt} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Wholesale (BDT) *</label><input type="number" step="0.01" name="wholesale_price_bdt" required value={formData.wholesale_price_bdt} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Retail (BDT) *</label><input type="number" step="0.01" name="retail_price_bdt" required value={formData.retail_price_bdt} onChange={handleChange} className={inputClass} /></div>
+        
+        {/* Import specific fields */}
+        <div className="col-span-1"><label className={labelClass}>Indian MRP (INR)</label><input type="number" step="0.01" name="mrp_inr" value={formData.mrp_inr} disabled={formData.source !== "Import"} onChange={handleChange} className={`${inputClass} ${formData.source !== 'Import' && 'bg-gray-100 text-gray-400'}`} /></div>
+        <div className="col-span-1"><label className={labelClass}>Markup %</label><input type="number" step="0.01" name="markup_percentage" value={formData.markup_percentage} disabled={formData.source !== "Import"} onChange={handleChange} className={`${inputClass} ${formData.source !== 'Import' && 'bg-gray-100 text-gray-400'}`} /></div>
+
+        {/* Units & Logistics */}
+        <div className={sectionHeaderClass}>3. Units & Specs</div>
+        <div className="col-span-1"><label className={labelClass}>Unit</label><input type="text" name="unit" value={formData.unit} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Alt Units</label><input type="text" name="alternative_units" value={formData.alternative_units} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>HS Code</label><input type="text" name="hs_code" value={formData.hs_code} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>VAT Code</label><input type="text" name="vat_code" value={formData.vat_code} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-2"><label className={labelClass}>Vehicle Compatibility</label><input type="text" name="vehicle_compatibility" value={formData.vehicle_compatibility} onChange={handleChange} placeholder="e.g., Honda CB 125" className={inputClass} /></div>
+
+        {/* Stock & Status */}
+        <div className={sectionHeaderClass}>4. Stock & Status</div>
+        <div className="col-span-1"><label className={labelClass}>Min Stock</label><input type="number" name="min_stock_level" value={formData.min_stock_level} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Reorder Point</label><input type="number" name="reorder_point" value={formData.reorder_point} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1"><label className={labelClass}>Max Stock</label><input type="number" name="max_stock_level" value={formData.max_stock_level} onChange={handleChange} className={inputClass} /></div>
+        <div className="col-span-1">
+          <label className={labelClass}>Status</label>
+          <select name="product_status" value={formData.product_status} onChange={handleChange} className={inputClass}>
+            <option value="Active">Active</option>
+            <option value="Discontinued">Discontinued</option>
+            <option value="Seasonal">Seasonal</option>
+            <option value="Damaged">Damaged</option>
+          </select>
+        </div>
+        <div className="col-span-1"><label className={labelClass}>Damage Price</label><input type="number" step="0.01" name="damage_discount_price" value={formData.damage_discount_price} disabled={formData.product_status !== "Damaged"} onChange={handleChange} className={`${inputClass} ${formData.product_status !== 'Damaged' && 'bg-gray-100 text-gray-400'}`} /></div>
+        <div className="col-span-1"><label className={labelClass}>Damage Remark</label><input type="text" name="damage_remark" value={formData.damage_remark} disabled={formData.product_status !== "Damaged"} onChange={handleChange} className={`${inputClass} ${formData.product_status !== 'Damaged' && 'bg-gray-100 text-gray-400'}`} /></div>
+
+        {/* Media */}
+        <div className={sectionHeaderClass}>5. Media</div>
+        {[1, 2, 3, 4, 5].map((num) => (
+          <div key={`img-${num}`} className="col-span-1">
+            <label className={labelClass}>Image {num}</label>
+            <input type="file" accept="image/*" name={`image_${num}`} onChange={handleChange} className="w-full text-[10px] text-gray-500 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-[10px] file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200 cursor-pointer" />
+          </div>
+        ))}
       </form>
     </div>
   );

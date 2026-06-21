@@ -42,8 +42,9 @@ export default function AddCustomer() {
     // 1. Fetch Employees for the dropdown
     const fetchEmployees = async () => {
       try {
-        const response = await axiosInstance.get("employees/");
-        setEmployeeList(response.data);
+        // ✅ FIXED PATH: Added "person/" and fallback for DRF pagination
+        const response = await axiosInstance.get("person/employees/");
+        setEmployeeList(response.data.results || response.data);
       } catch (err) {
         console.error("Failed to fetch employees for dropdown.");
       }
@@ -96,12 +97,14 @@ export default function AddCustomer() {
 
     try {
       if (isEditMode) {
-        await axiosInstance.patch(`customers/${editData.id}/`, submitData, {
+        // ✅ FIXED PATH: Added "person/"
+        await axiosInstance.patch(`person/customers/${editData.id}/`, submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         alert("Customer successfully updated!");
       } else {
-        await axiosInstance.post("customers/", submitData, {
+        // ✅ FIXED PATH: Added "person/"
+        await axiosInstance.post("person/customers/", submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         alert("Customer successfully added!");
@@ -316,7 +319,7 @@ export default function AddCustomer() {
                   <option value="">-- Select Employee --</option>
                   {employeeList.map(emp => (
                     <option key={emp.id} value={emp.id}>
-                      {emp.full_name} ({emp.employee_id})
+                      {emp.full_name || emp.name} ({emp.employee_id})
                     </option>
                   ))}
                 </select>

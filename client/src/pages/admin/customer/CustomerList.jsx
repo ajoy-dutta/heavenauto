@@ -40,8 +40,11 @@ export default function CustomerList() {
 
   const fetchCustomers = async () => {
     try {
-      const response = await axiosInstance.get("customers/");
-      setCustomers(response.data);
+      // ✅ Added "person/" to the path
+      const response = await axiosInstance.get("person/customers/"); 
+      
+      // ✅ Added fallback for DRF pagination (.results)
+      setCustomers(response.data.results || response.data); 
       setLoading(false);
     } catch (err) {
       setError("Failed to fetch customers.");

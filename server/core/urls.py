@@ -1,16 +1,39 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-
-# You need these two imports for media files:
 from django.conf import settings
 from django.conf.urls.static import static
+
+# --- ADD THESE TWO IMPORTS ---
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+
+# --- CREATE THE MASTER API ROOT VIEW ---
+@api_view(['GET'])
+def master_api_root(request):
+    """
+    Master API directory for Heaven Autos.
+    This generates a clickable list of all your app routers.
+    """
+    return Response({
+        "1. Person / HR API": request.build_absolute_uri('/api/person/'),
+        "2. Products API": request.build_absolute_uri('/api/products/'),
+        "3. Purchase API": request.build_absolute_uri('/api/purchase/'),
+        "4. Sale API": request.build_absolute_uri('/api/sale/'),
+        "5. Stock / Inventory API": request.build_absolute_uri('/api/stock/'),
+        "6. Brand API": request.build_absolute_uri('/api/brand/'),
+        "7. Supplier API": request.build_absolute_uri('/api/supplier/'),
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # This connects the person API to the main project
-    path('', include('person.urls')), 
+    # --- UPDATE YOUR ROOT PATHS ---
+    # Now, going to the base url or /api/ will show the master directory
+    path('', master_api_root, name='master-api-root'),
+    path('api/', master_api_root, name='api-root'),
+    
+    # Your modular app routes remain exactly the same
     path('api/person/', include('person.urls')),
     path('api/products/', include('products.urls')),
     path('api/purchase/', include('purchase.urls')),
@@ -19,12 +42,11 @@ urlpatterns = [
     path('api/brand/', include('brand.urls')),
     path('api/supplier/', include('supplier.urls')),   
 
-
+    # Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
 
-# --- ADD THIS BLOCK AT THE VERY BOTTOM ---
-# This tells Django to serve media files from your MEDIA_ROOT folder during development
+# Media Files
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
