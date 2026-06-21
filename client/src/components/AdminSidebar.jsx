@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { 
   FiUsers, 
-  FiBriefcase, 
   FiChevronDown, 
   FiChevronRight, 
   FiList, 
@@ -14,16 +13,12 @@ import {
   FiMenu, 
   FiX,
   FiTruck,
-  FiAlertCircle,
-  FiFileText,
   FiPieChart,
-  FiSettings,
   FiLayers 
 } from "react-icons/fi";
 import logo from "../assets/logo.jpg";
 
 export default function AdminSidebar() {
-  // Single state object to handle ALL dropdowns dynamically
   const [openDropdowns, setOpenDropdowns] = useState({});
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const navigate = useNavigate();
@@ -41,75 +36,54 @@ export default function AdminSidebar() {
     }));
   };
 
-  // 🚀 The ultimate scalable navigation array
+  // Reorganized Navigation Array
   const navItems = [
     { id: 1, type: "link", to: "/dashboard", label: "Dashboard Home", icon: FiHome },
     
-    // --- INVENTORY & SALES ---
-    { id: "h1", type: "heading", label: "Inventory & Sales" },
+    // --- TRADES ---
+    { id: "h_trades", type: "heading", label: "Trades" },
     { 
-      id: 2, type: "dropdown", label: "Products", icon: FiBox, stateKey: "products",
+      id: "sales", type: "dropdown", label: "Sales", icon: FiDollarSign, stateKey: "sales",
+      subItems: [
+        { to: "/dashboard/sales/add", label: "New Sale", icon: FiPlus },
+        { to: "/dashboard/sales", label: "Sale History", icon: FiList },
+      ]
+    },
+    { 
+      id: "purchases", type: "dropdown", label: "Purchases", icon: FiShoppingCart, stateKey: "purchases",
+      subItems: [
+        { to: "/dashboard/purchase/add", label: "New Purchase", icon: FiPlus },
+        { to: "/dashboard/purchase", label: "Purchase History", icon: FiList },
+      ]
+    },
+    { id: "stock", type: "link", to: "/dashboard/stock", label: "Live Stock", icon: FiBox },
+
+    // --- MASTER MANAGEMENT ---
+    { id: "h_master", type: "heading", label: "Master Management" },
+    { 
+      id: "products", type: "dropdown", label: "Products", icon: FiLayers, stateKey: "products",
       subItems: [
         { to: "/dashboard/products", label: "Product List", icon: FiList },
         { to: "/dashboard/products/add", label: "Add New Product", icon: FiPlus },
       ]
     },
     { 
-      id: 3, type: "dropdown", label: "Purchases", icon: FiShoppingCart, stateKey: "purchases",
-      subItems: [
-        { to: "/dashboard/purchase", label: "Purchase History", icon: FiList },
-        { to: "/dashboard/purchase/add", label: "Add New Purchase", icon: FiPlus },
-      ]
-    },
-    { 
-      id: 4, type: "dropdown", label: "Sales", icon: FiDollarSign, stateKey: "sales",
-      subItems: [
-        { to: "/dashboard/sales", label: "Sale History", icon: FiList },
-        { to: "/dashboard/sales/add", label: "Add New Sale", icon: FiPlus },
-      ]
-    },
-    { id: 5, type: "link", to: "/dashboard/stock", label: "Live Stock", icon: FiList },
-
-    // --- PEOPLE MANAGEMENT ---
-    { id: "h2", type: "heading", label: "People" },
-    { 
-      id: 6, type: "dropdown", label: "Employees", icon: FiBriefcase, stateKey: "employees",
-      subItems: [
-        { to: "/dashboard/employees", label: "Employee List", icon: FiList },
-        { to: "/dashboard/employees/add", label: "Add New Employee", icon: FiPlus },
-      ]
-    },
-    { 
-      id: 7, type: "dropdown", label: "Customers", icon: FiUsers, stateKey: "customers",
-      subItems: [
-        { to: "/dashboard/customers", label: "Customer List", icon: FiList },
-        { to: "/dashboard/customers/add", label: "Add New Customer", icon: FiPlus },
-      ]
-    },
-    
-    // --- ACCOUNTS & REPORTS ---
-    { id: "h3", type: "heading", label: "Business Operations" },
-    
-    { 
-      id: "finance", type: "dropdown", label: "Finance & Accounts", icon: FiDollarSign, stateKey: "finance",
-      subItems: [
-        { to: "/dashboard/finance/dashboard", label: "Financial Dashboard", icon: FiPieChart },
-        { to: "/dashboard/finance/chart-of-accounts", label: "Chart of Accounts", icon: FiLayers },
-      ]
-    },
-
-    // ✅ UPDATED: Converted Suppliers & Brands into a Dropdown Menu
-    { 
-      id: "masters", type: "dropdown", label: "Suppliers & Brands", icon: FiTruck, stateKey: "masters",
+      id: "partners", type: "dropdown", label: "Suppliers & Brands", icon: FiTruck, stateKey: "partners",
       subItems: [
         { to: "/dashboard/suppliers", label: "Supplier Directory", icon: FiUsers },
         { to: "/dashboard/brands", label: "Brands Master", icon: FiBox },
       ]
     },
-
-    { id: 9, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
-    { id: 11, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
-    { id: 12, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },
+    
+    // --- FINANCE ---
+    { id: "h_finance", type: "heading", label: "Finance" },
+    { 
+      id: "finance", type: "dropdown", label: "Finance & Accounts", icon: FiPieChart, stateKey: "finance",
+      subItems: [
+        { to: "/dashboard/finance/dashboard", label: "Financial Dashboard", icon: FiPieChart },
+        { to: "/dashboard/finance/chart-of-accounts", label: "Chart of Accounts", icon: FiList },
+      ]
+    },
   ];
 
   return (
@@ -140,7 +114,7 @@ export default function AdminSidebar() {
         ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}
       `}>
         
-        {/* Header - NOW WITH PRESSABLE LOGO AND TEXT */}
+        {/* Header */}
         <div className="p-4 border-b border-gray-800 flex justify-between items-center bg-gray-950">
           <Link 
             to="/dashboard" 

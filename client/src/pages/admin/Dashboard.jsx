@@ -25,25 +25,41 @@ export default function Dashboard() {
 
   const fetchAllStats = async () => {
     try {
-      // Fetch all core data simultaneously
-      const [productsRes, customersRes, employeesRes] = await Promise.all([
+      // Fetch all core data simultaneously, including the dedicated stocks API
+      const [productsRes, customersRes, employeesRes, stocksRes] = await Promise.all([
         axiosInstance.get("products/"),
-        axiosInstance.get("customers/"),
-        axiosInstance.get("employees/")
+        axiosInstance.get("person/customers/"), // Update route if yours is person/api/customers/
+        axiosInstance.get("person/employees/"),
+        axiosInstance.get("stock/stocks/")
       ]);
 
-      const products = productsRes.data;
+      // Safely extract data (handling DRF pagination if present)
+      const products = productsRes.data.results || productsRes.data;
+      const customers = customersRes.data.results || customersRes.data;
+      const employees = employeesRes.data.results || employeesRes.data;
+      const stocks = stocksRes.data.results || stocksRes.data;
       
-      // Calculate how many products are at or below their reorder point
-      const lowStockItems = products.filter(
-        (p) => p.stock_quantity <= (p.min_stock_level || 5)
-      ).length;
+      // Accurately calculate low stock by matching products with real-time stock levels
+      let lowStockItemsCount = 0;
+      
+      products.forEach((product) => {
+        // Find the matching stock entry for this product
+        const stockEntry = stocks.find(s => String(s.product) === String(product.id));
+        
+        // If a product isn't in the stock table yet, its quantity is 0
+        const currentQty = stockEntry ? (stockEntry.current_quantity ?? 0) : 0;
+        const minLevel = product.min_stock_level || 5; // Fallback to 5 if undefined
+        
+        if (currentQty <= minLevel) {
+          lowStockItemsCount++;
+        }
+      });
 
       setStats({
         productsCount: products.length,
-        lowStockCount: lowStockItems,
-        customersCount: customersRes.data.length,
-        employeesCount: employeesRes.data.length,
+        lowStockCount: lowStockItemsCount,
+        customersCount: customers.length,
+        employeesCount: employees.length,
       });
       setLoading(false);
     } catch (error) {
@@ -100,7 +116,7 @@ export default function Dashboard() {
               <FiAlertTriangle size={24} />
             </div>
           </div>
-          <Link to="/dashboard/products" className="text-xs text-amber-600 font-semibold mt-4 flex items-center gap-1 hover:text-amber-800">
+          <Link to="/dashboard/stock" className="text-xs text-amber-600 font-semibold mt-4 flex items-center gap-1 hover:text-amber-800">
             Check Thresholds <FiArrowRight />
           </Link>
         </div>
