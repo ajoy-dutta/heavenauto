@@ -3,6 +3,6 @@ from .models import Supplier
 from .serializers import SupplierSerializer
 
 class SupplierViewSet(viewsets.ModelViewSet):
-    # Only fetch active suppliers for standard dropdowns, order alphabetically
-    queryset = Supplier.objects.filter(is_active=True).order_by('name')
+    # FIX: Changed 'order_id' to 'order_by'
+    queryset = Supplier.objects.all().order_by('-id') 
     serializer_class = SupplierSerializer

@@ -128,7 +128,7 @@ export default function Supplier() {
                 <input type="text" value={formData.address || ""} onChange={(e) => setFormData({ ...formData, address: e.target.value })} className={inputClass} />
               </div>
               <div className="col-span-2 flex items-center gap-2 mt-1">
-                <input type="checkbox" id="isActive" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="w-3 h-3 text-gray-800" />
+                <input type="checkbox" id="isActive" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="w-3 h-3 text-gray-800 cursor-pointer" />
                 <label htmlFor="isActive" className="text-xs font-medium text-gray-700 cursor-pointer">Supplier is Active</label>
               </div>
 
