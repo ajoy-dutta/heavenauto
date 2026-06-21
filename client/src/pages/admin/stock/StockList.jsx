@@ -1,189 +1,221 @@
 import { useState, useEffect } from "react";
 import axiosInstance from "../../../api/axios";
-import { FiBox, FiSearch, FiAlertTriangle, FiCheckCircle, FiRefreshCw, FiXCircle } from "react-icons/fi";
+import { FiBox, FiSearch, FiAlertTriangle, FiRefreshCw, FiFilter } from "react-icons/fi";
 
 export default function StockList() {
   const [stocks, setStocks] = useState([]);
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   
   // Filtering States
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedBrand, setSelectedBrand] = useState("All");
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [showLowStock, setShowLowStock] = useState(false);
 
-  const fetchStocks = async () => {
+  const fetchData = async () => {
     setLoading(true);
     try {
-      // ✅ Updated to match your exact API route!
-      const response = await axiosInstance.get("stock/stocks/"); 
-      setStocks(response.data);
+      const [stockRes, prodRes] = await Promise.all([
+        axiosInstance.get("stock/stocks/"),
+        axiosInstance.get("products/")
+      ]); 
+      
+      setStocks(stockRes.data.results || stockRes.data);
+      setProducts(prodRes.data.results || prodRes.data);
       setError("");
     } catch (err) {
       console.error(err);
-      setError("Failed to load warehouse stock. Please try again.");
+      setError("Failed to load warehouse stock.");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchStocks();
+    fetchData();
   }, []);
 
-  // Filter logic mapped exactly to your JSON
-  const filteredStocks = stocks.filter((stock) => {
-    
-    // Safety check: using || "" prevents the page from crashing if a part_number is null
+  // --- DATA ENRICHMENT ---
+  // Merge stock data with product data to guarantee we have Category and Min Stock Level
+  const enrichedStocks = stocks.map(stock => {
+    const productDef = products.find(p => String(p.id) === String(stock.product)) || {};
+    return {
+      ...stock,
+      brand_name: stock.brand || productDef.brand || "Generic",
+      category: productDef.category || "Uncategorized",
+      min_stock_level: productDef.min_stock_level || 5, // Fallback to 5
+      current_quantity: stock.current_quantity ?? 0
+    };
+  });
+
+  // --- EXTRACT FILTER OPTIONS ---
+  const availableBrands = ["All", ...new Set(enrichedStocks.map(s => s.brand_name).filter(Boolean))].sort();
+  const availableCategories = ["All", ...new Set(enrichedStocks.map(s => s.category).filter(Boolean))].sort();
+
+  // --- APPLY FILTERS ---
+  const filteredStocks = enrichedStocks.filter((stock) => {
     const searchString = `${stock.product_name || ""} ${stock.part_number || ""} ${stock.category || ""}`.toLowerCase();
     const matchesSearch = searchString.includes(searchTerm.toLowerCase());
         
-    // Dynamic Low Stock: Checks against the specific product's min_stock_level
-    const threshold = stock.min_stock_level || 5; 
-    const matchesLowStock = showLowStock ? stock.current_quantity <= threshold : true;
+    const matchesBrand = selectedBrand === "All" || stock.brand_name === selectedBrand;
+    const matchesCategory = selectedCategory === "All" || stock.category === selectedCategory;
+    const matchesLowStock = showLowStock ? stock.current_quantity <= stock.min_stock_level : true;
 
-    return matchesSearch && matchesLowStock;
+    return matchesSearch && matchesBrand && matchesCategory && matchesLowStock;
   });
 
+  // --- GROUP BY BRAND ---
+  const groupedStocks = filteredStocks.reduce((groups, stock) => {
+    const brand = stock.brand_name;
+    if (!groups[brand]) {
+      groups[brand] = [];
+    }
+    groups[brand].push(stock);
+    return groups;
+  }, {});
+
+  // Minimal input classes
+  const inputClass = "w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-800 transition-colors shadow-sm";
+
   return (
-    <div className="p-6 text-gray-100">
+    <div className="p-3 sm:p-4 text-gray-900 bg-white min-h-screen max-w-7xl mx-auto border-x border-gray-200">
+      
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3 border-b border-gray-200 pb-3">
         <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <FiBox className="text-indigo-500" /> Live Warehouse Stock
+          <h1 className="text-lg font-bold flex items-center gap-2 text-gray-800 tracking-tight">
+            <FiBox className="text-gray-600" /> Live Warehouse Stock
           </h1>
-          <p className="text-sm text-gray-400 mt-1">
-            Automated ledger. Stock updates dynamically from Purchases and Sales.
-          </p>
         </div>
         <button
-          onClick={fetchStocks}
-          className="bg-gray-800 hover:bg-gray-700 border border-gray-600 text-white px-4 py-2 rounded-lg font-medium transition flex items-center gap-2 shadow-lg"
+          onClick={fetchData}
+          className="bg-gray-100 hover:bg-gray-200 border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-xs font-bold transition flex items-center gap-1.5 shadow-sm"
         >
-          <FiRefreshCw className={loading ? "animate-spin" : ""} /> Refresh Data
+          <FiRefreshCw size={12} className={loading ? "animate-spin" : ""} /> Refresh
         </button>
       </div>
 
       {error && (
-        <div className="bg-red-500/20 border border-red-500 text-red-300 p-4 rounded mb-6 flex items-center gap-2">
+        <div className="bg-red-50 border border-red-200 text-red-600 p-2 rounded mb-4 text-xs font-medium flex items-center gap-2">
           <FiAlertTriangle /> {error}
         </div>
       )}
 
-      {/* Controls & Table Container */}
-      <div className="bg-gray-800 rounded-xl border border-gray-700 overflow-hidden shadow-lg">
-        
-        {/* Toolbar */}
-        <div className="p-4 border-b border-gray-700 flex flex-col md:flex-row justify-between gap-4 bg-gray-900/50">
-          
-          {/* Search Bar */}
-          <div className="flex items-center gap-2 bg-gray-900 border border-gray-600 rounded-lg px-3 py-2 w-full md:w-96 focus-within:border-indigo-500 transition">
-            <FiSearch className="text-gray-400 text-lg" />
-            <input
-              type="text"
-              placeholder="Search product, part number, or category..."
-              className="w-full bg-transparent text-white focus:outline-none placeholder-gray-500 text-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-
-          {/* Low Stock Toggle */}
-          <button
-            onClick={() => setShowLowStock(!showLowStock)}
-            className={`px-4 py-2 rounded-lg text-sm font-bold transition flex items-center gap-2 border ${
-              showLowStock 
-                ? "bg-red-900/40 border-red-500 text-red-400 shadow-[0_0_15px_rgba(239,68,68,0.2)]" 
-                : "bg-gray-900 border-gray-600 text-gray-400 hover:text-white"
-            }`}
-          >
-            <FiAlertTriangle /> {showLowStock ? "Viewing Low Stock Alerts" : "Filter Low Stock"}
-          </button>
+      {/* Toolbar / Filters */}
+      <div className="flex flex-col md:flex-row gap-3 mb-5">
+        <div className="relative flex-1">
+          <FiSearch className="absolute left-2.5 top-2 text-gray-400" size={14} />
+          <input
+            type="text"
+            placeholder="Search parts or part numbers..."
+            className={inputClass}
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
         </div>
 
-        {/* Data Table */}
-        {loading ? (
-          <div className="p-12 text-center text-gray-400 animate-pulse">Scanning warehouse inventory...</div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-900 text-gray-400 text-xs uppercase tracking-wider">
-                  <th className="p-4 font-semibold">Status</th>
-                  <th className="p-4 font-semibold">Product Info</th>
-                  <th className="p-4 font-semibold">Category</th>
-                  <th className="p-4 font-semibold text-right">Available Qty</th>
-                  <th className="p-4 font-semibold text-right">Last Updated</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-700">
-                {filteredStocks.length > 0 ? (
-                  filteredStocks.map((stock) => {
-                    
-                    // Dynamic Status Calculation
-                    const threshold = stock.min_stock_level || 5;
-                    
-                    let statusColor = "text-green-500";
-                    let StatusIcon = FiCheckCircle;
-                    let statusText = "In Stock";
+        <div className="relative w-full md:w-48">
+          <FiFilter className="absolute left-2.5 top-2 text-gray-400" size={14} />
+          <select 
+            value={selectedBrand} 
+            onChange={(e) => setSelectedBrand(e.target.value)} 
+            className={`${inputClass} appearance-none`}
+          >
+            {availableBrands.map(b => <option key={b} value={b}>{b === "All" ? "All Brands" : b}</option>)}
+          </select>
+        </div>
 
-                    if (stock.current_quantity <= 0) {
-                      statusColor = "text-red-500";
-                      StatusIcon = FiXCircle;
-                      statusText = "Out of Stock";
-                    } else if (stock.current_quantity <= threshold) {
-                      statusColor = "text-yellow-500";
-                      StatusIcon = FiAlertTriangle;
-                      statusText = "Low Stock";
-                    }
+        <div className="relative w-full md:w-48">
+          <FiFilter className="absolute left-2.5 top-2 text-gray-400" size={14} />
+          <select 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)} 
+            className={`${inputClass} appearance-none`}
+          >
+            {availableCategories.map(c => <option key={c} value={c}>{c === "All" ? "All Categories" : c}</option>)}
+          </select>
+        </div>
 
-                    return (
-                      <tr key={stock.id} className="hover:bg-gray-750 transition">
-                        <td className="p-4">
-                          <div className={`flex items-center gap-1.5 font-bold text-sm ${statusColor}`}>
-                            <StatusIcon size={16} /> {statusText}
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <div className="font-semibold text-gray-200">{stock.product_name}</div>
-                          <div className="text-xs text-gray-500 font-mono mt-0.5">PN: {stock.part_number || "N/A"}</div>
-                        </td>
-                        <td className="p-4">
-                          <span className="bg-gray-700 text-gray-300 px-2 py-1 rounded text-xs font-medium">
-                            {stock.category || "General"}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className={`text-xl font-bold ${
-                            stock.current_quantity <= threshold ? 'text-red-400' : 'text-indigo-400'
-                          }`}>
-                            {stock.current_quantity}
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">Min: {threshold}</div>
-                        </td>
-                        <td className="p-4 text-right text-sm text-gray-400">
-                          {new Date(stock.last_updated).toLocaleString(undefined, {
-                            year: 'numeric', month: 'short', day: 'numeric',
-                            hour: '2-digit', minute:'2-digit'
-                          })}
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td colSpan="5" className="p-12 text-center text-gray-500">
-                      {searchTerm || showLowStock 
-                        ? "No items match your filter criteria." 
-                        : "Your warehouse is currently empty."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <button
+          onClick={() => setShowLowStock(!showLowStock)}
+          className={`px-3 py-1.5 rounded text-xs font-bold transition flex items-center justify-center gap-1.5 border shadow-sm w-full md:w-auto ${
+            showLowStock 
+              ? "bg-red-50 border-red-200 text-red-700" 
+              : "bg-white border-gray-300 text-gray-600 hover:bg-gray-50"
+          }`}
+        >
+          <FiAlertTriangle size={14} /> {showLowStock ? "Low Stock Only" : "Filter Low Stock"}
+        </button>
       </div>
+
+      {/* Grouped Data Tables */}
+      {loading ? (
+        <div className="p-8 text-center text-gray-400 text-sm animate-pulse">Scanning inventory...</div>
+      ) : Object.keys(groupedStocks).length === 0 ? (
+        <div className="p-8 text-center text-gray-500 text-sm border border-gray-200 rounded bg-gray-50">
+          No items match your filter criteria.
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(groupedStocks).map(([brandName, brandStocks]) => (
+            <div key={brandName} className="border border-gray-200 rounded shadow-sm overflow-hidden">
+              
+              {/* Brand Header */}
+              <div className="bg-gray-100 border-b border-gray-200 p-2 text-xs font-bold text-gray-800 uppercase tracking-wider flex justify-between items-center">
+                <span>Brand: {brandName}</span>
+                <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-500">
+                  {brandStocks.length} Items
+                </span>
+              </div>
+
+              {/* Brand Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs whitespace-nowrap">
+                  <thead className="bg-white text-gray-500 border-b border-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 font-semibold w-8">Status</th>
+                      <th className="px-3 py-2 font-semibold">Product Name</th>
+                      <th className="px-3 py-2 font-semibold">Part No.</th>
+                      <th className="px-3 py-2 font-semibold">Category</th>
+                      <th className="px-3 py-2 font-semibold text-right">In Stock</th>
+                      <th className="px-3 py-2 font-semibold text-right text-[10px] text-gray-400">Min.</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {brandStocks.map((stock) => {
+                      const isOutOfStock = stock.current_quantity <= 0;
+                      const isLowStock = !isOutOfStock && stock.current_quantity <= stock.min_stock_level;
+                      
+                      return (
+                        <tr key={stock.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-1.5 text-center">
+                            <div className={`w-2.5 h-2.5 rounded-full mx-auto shadow-sm ${
+                              isOutOfStock ? 'bg-red-500' : isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
+                            }`} title={isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'Healthy'} />
+                          </td>
+                          <td className="px-3 py-1.5 font-medium text-gray-800">{stock.product_name}</td>
+                          <td className="px-3 py-1.5 text-gray-500 font-mono">{stock.part_number || "-"}</td>
+                          <td className="px-3 py-1.5 text-gray-500">{stock.category}</td>
+                          <td className="px-3 py-1.5 text-right font-bold">
+                            <span className={isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-gray-800'}>
+                              {stock.current_quantity}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1.5 text-right text-[10px] text-gray-400 font-mono">
+                            {stock.min_stock_level}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
