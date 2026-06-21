@@ -18,7 +18,7 @@ import {
   FiFileText,
   FiPieChart,
   FiSettings,
-  FiLayers // ✅ Added FiLayers for the Chart of Accounts icon
+  FiLayers 
 } from "react-icons/fi";
 import logo from "../assets/logo.jpg";
 
@@ -90,7 +90,6 @@ export default function AdminSidebar() {
     // --- ACCOUNTS & REPORTS ---
     { id: "h3", type: "heading", label: "Business Operations" },
     
-    // ✅ NEW: Finance Hub Dropdown
     { 
       id: "finance", type: "dropdown", label: "Finance & Accounts", icon: FiDollarSign, stateKey: "finance",
       subItems: [
@@ -99,7 +98,15 @@ export default function AdminSidebar() {
       ]
     },
 
-    { id: 8, type: "link", to: "/dashboard/suppliers", label: "Suppliers & Brands", icon: FiTruck },
+    // ✅ UPDATED: Converted Suppliers & Brands into a Dropdown Menu
+    { 
+      id: "masters", type: "dropdown", label: "Suppliers & Brands", icon: FiTruck, stateKey: "masters",
+      subItems: [
+        { to: "/dashboard/suppliers", label: "Supplier Directory", icon: FiUsers },
+        { to: "/dashboard/brands", label: "Brands Master", icon: FiBox },
+      ]
+    },
+
     { id: 9, type: "link", to: "/dashboard/stock-alerts", label: "Stock Alerts", icon: FiAlertCircle },
     { id: 11, type: "link", to: "/dashboard/reports", label: "System Reports", icon: FiPieChart },
     { id: 12, type: "link", to: "/dashboard/settings", label: "Settings", icon: FiSettings },

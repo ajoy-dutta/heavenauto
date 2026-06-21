@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiPlus, FiTrash2, FiLayers, FiEdit2 } from "react-icons/fi";
+import { FiPlus, FiTrash2, FiLayers, FiEdit2, FiX } from "react-icons/fi";
 
 export default function AddPurchase() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function AddPurchase() {
 
   // --- UI TOGGLE STATE ---
   const [entryMode, setEntryMode] = useState("manual"); // 'manual' or 'brand'
-  const [selectedBrand, setSelectedBrand] = useState("");
+  const [selectedBrands, setSelectedBrands] = useState([]); 
 
   // --- ORDER HEADER STATE ---
   const [orderData, setOrderData] = useState({
@@ -28,11 +28,9 @@ export default function AddPurchase() {
   });
 
   // --- ITEM STATES ---
-  // Mode 1: Manual Rows
   const [manualItems, setManualItems] = useState([
     { product: "", unit_cost_bdt: "", quantity: "" }
   ]);
-  // Mode 2: Brand Batch Rows
   const [brandItems, setBrandItems] = useState([]);
 
   // --- FETCH ALL INITIAL DATA ---
@@ -62,9 +60,13 @@ export default function AddPurchase() {
 
   // --- HELPER: GET STOCK ---
   const getProductStock = (productId) => {
-    // Adjust 'product' and 'quantity' keys based on your actual stock model structure
     const stockItem = stocks.find(s => String(s.product) === String(productId));
-    return stockItem ? stockItem.quantity || stockItem.current_stock : 0;
+    return stockItem ? (stockItem.current_quantity ?? 0) : 0;
+  };
+
+  const getBrandName = (brandId) => {
+    const brand = brands.find(b => String(b.id) === String(brandId));
+    return brand ? brand.name : "Unknown Brand";
   };
 
   // --- HANDLERS: HEADER ---
@@ -89,34 +91,69 @@ export default function AddPurchase() {
     }
   };
 
-  // --- HANDLERS: BRAND MODE ---
-  const handleBrandSelection = (e) => {
-    const brandId = e.target.value;
-    setSelectedBrand(brandId);
+  // --- HANDLERS: BRAND MODE (MULTI-SELECT DROPDOWN) ---
+  const handleBrandDropdownSelect = (e) => {
+    const brandId = Number(e.target.value);
+    if (!brandId) return;
 
-    if (!brandId) {
-      setBrandItems([]);
-      return;
+    if (!selectedBrands.includes(brandId)) {
+      toggleBrandSelection(brandId);
     }
+    
+    // Reset dropdown visually so user can pick another
+    e.target.value = "";
+  };
 
-    // Filter products by selected brand and build batch array
-    const filteredProducts = products.filter(p => String(p.brand) === String(brandId));
-    const batchItems = filteredProducts.map(p => ({
-      product: p.id,
-      product_name: p.product_name || p.name,
-      // Pre-fill with existing purchase cost if available, otherwise empty
-      unit_cost_bdt: p.purchase_cost_bdt || "", 
-      quantity: "",
-      current_stock: getProductStock(p.id)
-    }));
+  const toggleBrandSelection = (brandId) => {
+    setSelectedBrands((prev) => {
+      if (prev.includes(brandId)) {
+        // REMOVE BRAND
+        const newBrands = prev.filter(id => id !== brandId);
+        setBrandItems(currentItems => {
+          const removedProductIds = products
+            .filter(p => String(p.brand) === String(brandId))
+            .map(p => String(p.id));
+          return currentItems.filter(item => !removedProductIds.includes(String(item.product)));
+        });
+        return newBrands;
+      } else {
+        // ADD BRAND
+        const newBrands = [...prev, brandId];
+        const productsToAdd = products.filter(p => String(p.brand) === String(brandId));
+        
+        const newBatchItems = productsToAdd.map(p => ({
+          product: p.id,
+          product_name: p.product_name || p.name,
+          brand_name: getBrandName(p.brand),
+          unit_cost_bdt: p.purchase_cost_bdt || "", 
+          quantity: "",
+          current_stock: getProductStock(p.id)
+        }));
 
-    setBrandItems(batchItems);
+        setBrandItems(currentItems => {
+          const existingProductIds = currentItems.map(item => String(item.product));
+          const uniqueNewItems = newBatchItems.filter(item => !existingProductIds.includes(String(item.product)));
+          return [...currentItems, ...uniqueNewItems];
+        });
+
+        return newBrands;
+      }
+    });
   };
 
   const handleBrandItemChange = (index, field, value) => {
     const newItems = [...brandItems];
     newItems[index][field] = value;
     setBrandItems(newItems);
+  };
+
+  const removeBrandRow = (index) => {
+    setBrandItems(brandItems.filter((_, i) => i !== index));
+  };
+
+  const clearEntireBatch = () => {
+    setBrandItems([]);
+    setSelectedBrands([]); 
   };
 
   // --- CALCULATIONS ---
@@ -140,12 +177,10 @@ export default function AddPurchase() {
       return;
     }
 
-    // 1. Filter out empty items based on mode
     let itemsToSubmit = [];
     if (entryMode === "manual") {
       itemsToSubmit = manualItems.filter(i => i.product && parseFloat(i.quantity) > 0 && parseFloat(i.unit_cost_bdt) >= 0);
     } else {
-      // In brand mode, only submit products where user typed a quantity > 0
       itemsToSubmit = brandItems.filter(i => parseFloat(i.quantity) > 0 && parseFloat(i.unit_cost_bdt) >= 0);
     }
 
@@ -155,7 +190,6 @@ export default function AddPurchase() {
       return;
     }
 
-    // 2. Format Payload
     const payload = {
       ...orderData,
       items: itemsToSubmit.map(item => ({
@@ -219,7 +253,16 @@ export default function AddPurchase() {
               className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white"
             >
               <option value="">-- Select Employee --</option>
-              {employees.map(e => <option key={e.id} value={e.id}>{e.name || e.employee_id}</option>)}
+              {employees.map(e => {
+                const displayName = e.first_name 
+                  ? `${e.first_name} ${e.last_name || ''}`.trim() 
+                  : e.full_name || e.name || e.employee_id;
+                return (
+                  <option key={e.id} value={e.id}>
+                    {displayName} ({e.employee_id})
+                  </option>
+                );
+              })}
             </select>
           </div>
           <div>
@@ -245,34 +288,72 @@ export default function AddPurchase() {
             onClick={() => setEntryMode("brand")}
             className={`flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-md transition ${entryMode === "brand" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-500 hover:bg-gray-200"}`}
           >
-            <FiLayers size={16} /> Filter by Brand
+            <FiLayers size={16} /> Batch Add by Brand
           </button>
         </div>
 
         {/* --- ITEMS TABLE --- */}
         <div className="p-0 overflow-x-auto">
+          
+          {/* MULTI-BRAND DROPDOWN & PILLS UI */}
           {entryMode === "brand" && (
-            <div className="p-4 bg-blue-50/50 border-b border-gray-100">
-              <label className="block text-xs font-bold text-gray-600 mb-1">Select Brand to Load Products</label>
-              <select
-                value={selectedBrand} onChange={handleBrandSelection}
-                className="w-full max-w-sm border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white"
-              >
-                <option value="">-- Choose Brand --</option>
-                {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-              </select>
+            <div className="p-4 bg-blue-50/50 border-b border-gray-100 flex flex-col md:flex-row md:items-start justify-between gap-4">
+              <div className="flex-1 max-w-lg">
+                <label className="block text-xs font-bold text-gray-600 mb-1">Select Brands to Load Products</label>
+                <select
+                  onChange={handleBrandDropdownSelect}
+                  defaultValue=""
+                  className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none bg-white shadow-sm"
+                >
+                  <option value="" disabled>-- Choose a Brand to Add --</option>
+                  {brands.filter(b => !selectedBrands.includes(b.id)).map(b => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+                
+                {/* Active Brand Tags */}
+                {selectedBrands.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {selectedBrands.map(id => {
+                      const b = brands.find(brand => brand.id === id);
+                      return b ? (
+                        <span key={id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full border border-blue-200">
+                          {b.name}
+                          <button 
+                            type="button" 
+                            onClick={() => toggleBrandSelection(id)} 
+                            className="text-blue-500 hover:text-blue-900 bg-white rounded-full p-0.5"
+                          >
+                            <FiX size={12}/>
+                          </button>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
+                )}
+              </div>
+              
+              {brandItems.length > 0 && (
+                <button 
+                  type="button" 
+                  onClick={clearEntireBatch}
+                  className="mt-6 text-xs font-bold text-red-500 hover:text-red-700 underline whitespace-nowrap"
+                >
+                  Clear Entire Batch
+                </button>
+              )}
             </div>
           )}
 
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead className="bg-gray-100 text-gray-600 font-bold border-b border-gray-200">
               <tr>
-                <th className="p-3 w-1/3">Product</th>
+                <th className="p-3 w-1/3">Product & Brand</th>
                 <th className="p-3 w-32">Current Stock</th>
                 <th className="p-3 w-40">Unit Cost (৳)</th>
                 <th className="p-3 w-32">Purchase Qty</th>
                 <th className="p-3 w-32 text-right">Row Total</th>
-                {entryMode === "manual" && <th className="p-3 w-12 text-center"></th>}
+                <th className="p-3 w-12 text-center"></th>
               </tr>
             </thead>
             <tbody>
@@ -280,7 +361,10 @@ export default function AddPurchase() {
               {/* RENDER BRAND BATCH LIST */}
               {entryMode === "brand" && brandItems.map((item, index) => (
                 <tr key={item.product} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="p-3 font-medium text-gray-800">{item.product_name}</td>
+                  <td className="p-3">
+                    <div className="font-medium text-gray-800">{item.product_name}</div>
+                    <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">{item.brand_name}</div>
+                  </td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${item.current_stock <= 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
                       {item.current_stock}
@@ -305,57 +389,81 @@ export default function AddPurchase() {
                   <td className="p-3 text-right font-mono text-gray-600">
                     {((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost_bdt) || 0)).toFixed(2)}
                   </td>
-                </tr>
-              ))}
-
-              {/* RENDER MANUAL LIST */}
-              {entryMode === "manual" && manualItems.map((item, index) => (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
-                  <td className="p-3">
-                    <select
-                      required
-                      value={item.product}
-                      onChange={(e) => handleManualItemChange(index, "product", e.target.value)}
-                      className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500 bg-white"
-                    >
-                      <option value="">Select Product</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.product_name || p.name}</option>)}
-                    </select>
-                  </td>
-                  <td className="p-3">
-                     <span className="text-gray-500 font-bold px-2">
-                       {item.product ? getProductStock(item.product) : "-"}
-                     </span>
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="number" step="0.01" required min="0" placeholder="0.00"
-                      value={item.unit_cost_bdt}
-                      onChange={(e) => handleManualItemChange(index, "unit_cost_bdt", e.target.value)}
-                      className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500"
-                    />
-                  </td>
-                  <td className="p-3">
-                    <input
-                      type="number" required min="1" placeholder="0"
-                      value={item.quantity}
-                      onChange={(e) => handleManualItemChange(index, "quantity", e.target.value)}
-                      className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500"
-                    />
-                  </td>
-                  <td className="p-3 text-right font-mono text-gray-600">
-                    {((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost_bdt) || 0)).toFixed(2)}
-                  </td>
                   <td className="p-3 text-center">
                     <button
-                      type="button" onClick={() => removeManualRow(index)} disabled={manualItems.length === 1}
-                      className={`p-1.5 rounded transition ${manualItems.length === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                      type="button" onClick={() => removeBrandRow(index)}
+                      className="p-1.5 rounded transition text-red-500 hover:bg-red-50"
+                      title="Remove from batch"
                     >
                       <FiTrash2 size={16} />
                     </button>
                   </td>
                 </tr>
               ))}
+
+              {/* RENDER MANUAL LIST */}
+              {entryMode === "manual" && manualItems.map((item, index) => {
+                // Determine brand name for manual row if a product is selected
+                const selectedProd = products.find(p => String(p.id) === String(item.product));
+                const manualBrandName = selectedProd ? getBrandName(selectedProd.brand) : "";
+
+                return (
+                  <tr key={index} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="p-3">
+                      <select
+                        required
+                        value={item.product}
+                        onChange={(e) => handleManualItemChange(index, "product", e.target.value)}
+                        className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500 bg-white"
+                      >
+                        <option value="">Select Product</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>
+                            {p.product_name || p.name} ({getBrandName(p.brand)})
+                          </option>
+                        ))}
+                      </select>
+                      {manualBrandName && (
+                        <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-1 pl-1">
+                          {manualBrandName}
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-3">
+                       <span className="text-gray-500 font-bold px-2">
+                         {item.product ? getProductStock(item.product) : "-"}
+                       </span>
+                    </td>
+                    <td className="p-3">
+                      <input
+                        type="number" step="0.01" required min="0" placeholder="0.00"
+                        value={item.unit_cost_bdt}
+                        onChange={(e) => handleManualItemChange(index, "unit_cost_bdt", e.target.value)}
+                        className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500"
+                      />
+                    </td>
+                    <td className="p-3">
+                      <input
+                        type="number" required min="1" placeholder="0"
+                        value={item.quantity}
+                        onChange={(e) => handleManualItemChange(index, "quantity", e.target.value)}
+                        className="w-full border border-gray-300 rounded p-1.5 text-sm outline-none focus:border-blue-500"
+                      />
+                    </td>
+                    <td className="p-3 text-right font-mono text-gray-600">
+                      {((parseFloat(item.quantity) || 0) * (parseFloat(item.unit_cost_bdt) || 0)).toFixed(2)}
+                    </td>
+                    <td className="p-3 text-center">
+                      <button
+                        type="button" onClick={() => removeManualRow(index)} disabled={manualItems.length === 1}
+                        className={`p-1.5 rounded transition ${manualItems.length === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-red-500 hover:bg-red-50'}`}
+                      >
+                        <FiTrash2 size={16} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
 
@@ -370,9 +478,9 @@ export default function AddPurchase() {
             </div>
           )}
 
-          {entryMode === "brand" && brandItems.length === 0 && selectedBrand && (
+          {entryMode === "brand" && brandItems.length === 0 && (
             <div className="p-8 text-center text-gray-400 text-sm">
-              No products found for this brand.
+              Use the dropdown above to add brands and load their products into this batch.
             </div>
           )}
         </div>

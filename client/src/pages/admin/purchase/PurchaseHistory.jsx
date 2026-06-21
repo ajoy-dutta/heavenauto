@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiPlus, FiBox, FiSearch, FiEdit, FiX, FiSave, FiTrash2, FiEye } from "react-icons/fi";
+import { FiPlus, FiBox, FiSearch, FiX, FiSave, FiTrash2, FiEye } from "react-icons/fi";
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [products, setProducts] = useState([]);
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -24,15 +26,19 @@ export default function PurchaseHistory() {
 
   const fetchData = async () => {
     try {
-      // Fetch purchases, suppliers, and employees
-      const [purRes, supRes, empRes] = await Promise.all([
+      // Fetch purchases, suppliers, employees, PLUS brands and products for accurate naming
+      const [purRes, supRes, empRes, brandRes, prodRes] = await Promise.all([
         axiosInstance.get("purchase/purchases/"),
         axiosInstance.get("supplier/suppliers/"),
-        axiosInstance.get("person/employees/")
+        axiosInstance.get("person/employees/"),
+        axiosInstance.get("brand/brands/"),
+        axiosInstance.get("products/")
       ]);
       setPurchases(purRes.data.results || purRes.data);
       setSuppliers(supRes.data.results || supRes.data);
       setEmployees(empRes.data.results || empRes.data);
+      setBrands(brandRes.data.results || brandRes.data);
+      setProducts(prodRes.data.results || prodRes.data);
       setLoading(false);
     } catch (err) {
       setError("Failed to fetch purchase data.");
@@ -86,10 +92,19 @@ export default function PurchaseHistory() {
     }
   };
 
-  // Helper to get Supplier Name
+  // --- HELPERS ---
   const getSupplierName = (id) => {
     const sup = suppliers.find(s => String(s.id) === String(id));
     return sup ? (sup.name || sup.company_name) : "Unknown Supplier";
+  };
+
+  const getBrandName = (item) => {
+    // Cross-reference the product to find the brand ID, then get the brand name
+    const product = products.find(p => String(p.id) === String(item.product) || p.product_name === item.product_name);
+    if (!product) return "Unknown Brand";
+    
+    const brand = brands.find(b => String(b.id) === String(product.brand));
+    return brand ? brand.name : "Unknown Brand";
   };
 
   // Filter purchases
@@ -241,7 +256,7 @@ export default function PurchaseHistory() {
                   <table className="w-full text-left text-sm whitespace-nowrap">
                     <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                       <tr>
-                        <th className="p-2 font-semibold">Product</th>
+                        <th className="p-2 font-semibold">Product & Brand</th>
                         <th className="p-2 font-semibold text-right">Qty</th>
                         <th className="p-2 font-semibold text-right">Unit Cost</th>
                         <th className="p-2 font-semibold text-right">Total</th>
@@ -250,7 +265,13 @@ export default function PurchaseHistory() {
                     <tbody className="divide-y divide-gray-100">
                       {selectedItems.map((item, idx) => (
                         <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2 text-gray-800 font-medium">{item.product_name}</td>
+                          <td className="p-2">
+                            <div className="text-gray-800 font-medium">{item.product_name}</div>
+                            {/* NEW: Displays the brand name below the product name */}
+                            <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">
+                              {getBrandName(item)}
+                            </div>
+                          </td>
                           <td className="p-2 text-right">{item.quantity}</td>
                           <td className="p-2 text-right">৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}</td>
                           <td className="p-2 text-right font-bold text-gray-700">৳ {parseFloat(item.total_cost_bdt).toFixed(2)}</td>
@@ -282,7 +303,16 @@ export default function PurchaseHistory() {
                       className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     >
                       <option value="">Select Employee</option>
-                      {employees.map(e => <option key={e.id} value={e.id}>{e.name || e.employee_id}</option>)}
+                      {employees.map(e => {
+                        const displayName = e.first_name 
+                          ? `${e.first_name} ${e.last_name || ''}`.trim() 
+                          : e.full_name || e.name || e.employee_id;
+                        return (
+                          <option key={e.id} value={e.id}>
+                            {displayName} ({e.employee_id})
+                          </option>
+                        );
+                      })}
                     </select>
                   </div>
                   <div>

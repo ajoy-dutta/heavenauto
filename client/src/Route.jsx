@@ -22,16 +22,20 @@ import StockList from './pages/admin/stock/StockList';
 import SaleHistory from './pages/admin/sales/SaleHistory';
 import AddSale from './pages/admin/sales/AddSale';
 
-// Finance Pages (Updated Imports)
+// Finance Pages
 import FinancialDashboard from "./pages/admin/finance/FinancialDashboard";
 import ChartOfAccounts from "./pages/admin/finance/ChartOfAccounts";
+
+// Master Data Pages
+import Brand from "./pages/admin/masters/Brand";
+import Supplier from "./pages/admin/masters/Supplier";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <Layout />,
     children: [
-      { index: true, element: <Home /> }, // Uses index: true for default root
+      { index: true, element: <Home /> }, 
       { path: "login", element: <Login /> },
     ],
   },
@@ -39,22 +43,22 @@ export const router = createBrowserRouter([
     path: "/dashboard",
     element: <AdminLayout />,
     children: [
-      { index: true, element: <Dashboard /> }, // Default view when hitting /dashboard
+      { index: true, element: <Dashboard /> },
       
       // Employee Routes
       { path: "employees", element: <EmployeeManage /> },
       { path: "employees/add", element: <AddEmployee /> },
-      { path: "employees/edit/:id", element: <AddEmployee /> }, // ✅ Added Edit
+      { path: "employees/edit/:id", element: <AddEmployee /> },
 
       // Customer Routes
       { path: "customers", element: <CustomerManage /> },
       { path: "customers/add", element: <AddCustomer /> },
-      { path: "customers/edit/:id", element: <AddCustomer /> }, // ✅ Added Edit
+      { path: "customers/edit/:id", element: <AddCustomer /> },
 
       // Product Routes
       { path: "products", element: <ProductList /> },
       { path: "products/add", element: <AddProduct /> },
-      { path: "products/edit/:id", element: <AddProduct /> },   // ✅ Added Edit
+      { path: "products/edit/:id", element: <AddProduct /> },
 
       // Purchase Routes
       { path: "purchase", element: <PurchaseHistory /> },
@@ -67,9 +71,13 @@ export const router = createBrowserRouter([
       { path: "sales", element: <SaleHistory /> },
       { path: "sales/add", element: <AddSale /> },
       
-      // Finance Routes (✅ Updated to match your new sidebar links)
+      // Finance Routes
       { path: "finance/dashboard", element: <FinancialDashboard /> },
-      { path: "finance/chart-of-accounts", element: <ChartOfAccounts /> }
+      { path: "finance/chart-of-accounts", element: <ChartOfAccounts /> },
+
+      // Master Data Routes
+      { path: "brands", element: <Brand /> },
+      { path: "suppliers", element: <Supplier /> }
     ],
   },
 ]);

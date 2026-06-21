@@ -1,48 +1,71 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiAlertTriangle, FiEye, FiImage, FiX, FiUpload } from "react-icons/fi";
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiEye, FiImage, FiX, FiUpload, FiFilter } from "react-icons/fi";
 
 export default function ProductList() {
   const [products, setProducts] = useState([]);
+  const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  
+  // Filters & Search
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState("All");
   
+  // Pagination (Load 20 at a time)
+  const [visibleCount, setVisibleCount] = useState(20);
+
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [importing, setImporting] = useState(false);
   const fileInputRef = useRef(null);
-
   const [fullScreenImage, setFullScreenImage] = useState(null);
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchProducts();
+    fetchData();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axiosInstance.get("products/");
+      // Fetch both products and brands simultaneously
+      const [prodRes, brandRes] = await Promise.all([
+        axiosInstance.get("products/"),
+        axiosInstance.get("brand/brands/")
+      ]);
       
       let dataArray = [];
-      if (response.data && Array.isArray(response.data.results)) {
-        dataArray = response.data.results; 
-      } else if (Array.isArray(response.data)) {
-        dataArray = response.data; 
-      } else {
-        throw new Error("Invalid data format from server");
+      if (prodRes.data && Array.isArray(prodRes.data.results)) {
+        dataArray = prodRes.data.results; 
+      } else if (Array.isArray(prodRes.data)) {
+        dataArray = prodRes.data; 
+      }
+
+      let brandsArray = [];
+      if (brandRes.data && Array.isArray(brandRes.data.results)) {
+        brandsArray = brandRes.data.results;
+      } else if (Array.isArray(brandRes.data)) {
+        brandsArray = brandRes.data;
       }
 
       setProducts(dataArray);
+      setBrands(brandsArray);
       setLoading(false);
     } catch (err) {
       console.error("API Error:", err);
-      setError(err.response?.data?.detail || "Failed to fetch products from the warehouse database.");
+      setError(err.response?.data?.detail || "Failed to fetch data from the warehouse database.");
       setProducts([]); 
+      setBrands([]);
       setLoading(false);
     }
+  };
+
+  const getBrandName = (brandId) => {
+    if (!brandId) return "Generic";
+    const brand = brands.find(b => String(b.id) === String(brandId));
+    return brand ? brand.name : "Unknown";
   };
 
   const handleDelete = async (id) => {
@@ -71,7 +94,7 @@ export default function ProductList() {
         headers: { "Content-Type": "multipart/form-data" },
       });
       alert(response.data.message); 
-      fetchProducts(); 
+      fetchData(); 
     } catch (err) {
       console.error(err);
       setError("Failed to import Excel. Ensure your column names match the system exactly.");
@@ -81,20 +104,34 @@ export default function ProductList() {
     }
   };
 
+  // Reset pagination when a filter changes
+  useEffect(() => {
+    setVisibleCount(20);
+  }, [searchTerm, selectedCategory, selectedBrand]);
+
   const filteredProducts = products.filter((product) => {
     const searchLower = (searchTerm || "").toLowerCase();
+    const actualBrandName = getBrandName(product.brand).toLowerCase();
+    
+    // Safely check all fields, preventing null/integer crashes
     const matchesSearch =
       (product.product_name || "").toLowerCase().includes(searchLower) ||
-      (product.brand || "").toLowerCase().includes(searchLower) ||
+      actualBrandName.includes(searchLower) ||
       (product.product_id || "").toLowerCase().includes(searchLower) ||
       (product.part_number || "").toLowerCase().includes(searchLower) ||
       (product.barcode || "").toLowerCase().includes(searchLower);
       
     const matchesCategory = selectedCategory === "All" || product.category === selectedCategory;
-    return matchesSearch && matchesCategory;
+    const matchesBrand = selectedBrand === "All" || String(product.brand) === String(selectedBrand);
+    
+    return matchesSearch && matchesCategory && matchesBrand;
   });
 
+  // Extract unique categories for the dropdown
   const categories = ["All", ...new Set(products.map((p) => p.category).filter(Boolean))];
+
+  // Apply the 20-item workload limit
+  const visibleProducts = filteredProducts.slice(0, visibleCount);
 
   if (loading) {
     return (
@@ -106,10 +143,8 @@ export default function ProductList() {
   }
 
   return (
-    // Reduced padding on small screens (p-4 sm:p-6)
     <div className="bg-white text-gray-900 p-4 sm:p-6 rounded-xl shadow-md border border-gray-200 relative">
       
-      {/* Mobile-Responsive Header: Buttons stretch full width and stack on mobile */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-800">Motorcycle Parts Master List</h1>
@@ -117,7 +152,7 @@ export default function ProductList() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          <input type="file" accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel, .csv, .xlsx, .xls" ref={fileInputRef} onChange={handleExcelImport} className="hidden" />
+          <input type="file" accept=".csv, .xlsx, .xls" ref={fileInputRef} onChange={handleExcelImport} className="hidden" />
           
           <button onClick={() => fileInputRef.current.click()} disabled={importing} className="w-full sm:w-auto flex justify-center items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-3 sm:py-2.5 rounded-lg transition shadow hover:shadow-lg disabled:bg-emerald-400">
             <FiUpload />
@@ -132,19 +167,44 @@ export default function ProductList() {
 
       {error && <div className="bg-red-50 border border-red-200 text-red-600 p-4 rounded-lg mb-6 text-sm font-semibold">{error}</div>}
 
-      {/* Search and Filter stack neatly on mobile */}
-      <div className="flex flex-col md:flex-row gap-4 mb-6">
-        <div className="relative flex-1">
+      {/* FILTERS & SEARCH */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="relative">
           <FiSearch className="absolute left-3 top-3.5 text-gray-400" />
-          <input type="text" placeholder="Search by ID, Part No, Name, Brand, or Barcode..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm shadow-sm" />
+          <input 
+            type="text" 
+            placeholder="Search parts, brands, barcodes..." 
+            value={searchTerm} 
+            onChange={(e) => setSearchTerm(e.target.value)} 
+            className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition text-sm shadow-sm" 
+          />
         </div>
-        <select value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)} className="w-full md:w-auto bg-white border border-gray-300 text-gray-700 px-4 py-3 sm:py-2.5 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-sm">
-          {categories.map((cat) => ( <option key={cat} value={cat}>Category: {cat}</option> ))}
-        </select>
+        
+        <div className="relative">
+          <FiFilter className="absolute left-3 top-3.5 text-gray-400" />
+          <select 
+            value={selectedCategory} 
+            onChange={(e) => setSelectedCategory(e.target.value)} 
+            className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-sm appearance-none"
+          >
+            {categories.map((cat) => ( <option key={cat} value={cat}>Category: {cat}</option> ))}
+          </select>
+        </div>
+
+        <div className="relative">
+          <FiFilter className="absolute left-3 top-3.5 text-gray-400" />
+          <select 
+            value={selectedBrand} 
+            onChange={(e) => setSelectedBrand(e.target.value)} 
+            className="w-full pl-10 pr-4 py-3 sm:py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm shadow-sm appearance-none"
+          >
+            <option value="All">Brand: All Brands</option>
+            {brands.map((b) => ( <option key={b.id} value={b.id}>Brand: {b.name}</option> ))}
+          </select>
+        </div>
       </div>
 
-      {/* Table handles mobile gracefully via horizontal scroll (overflow-x-auto) */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm scrollbar-thin scrollbar-thumb-gray-300">
+      <div className="overflow-x-auto rounded-lg border border-gray-200 shadow-sm scrollbar-thin scrollbar-thumb-gray-300 mb-4">
         <table className="w-full text-left border-collapse whitespace-nowrap min-w-[800px]">
           <thead>
             <tr className="bg-gray-50 text-gray-600 border-b border-gray-200 text-xs font-bold uppercase tracking-wider">
@@ -158,49 +218,59 @@ export default function ProductList() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200 text-sm">
-            {filteredProducts.length === 0 ? (
-              <tr><td colSpan="7" className="p-8 text-center text-gray-500">No matching products found or database is empty.</td></tr>
+            {visibleProducts.length === 0 ? (
+              <tr><td colSpan="7" className="p-8 text-center text-gray-500">No matching products found.</td></tr>
             ) : (
-              filteredProducts.map((product) => {
-                return (
-                  <tr key={product.id} className="hover:bg-gray-50 transition items-center">
-                    <td className="p-4">
-                      {product.image_1 ? (
-                        <img src={product.image_1} alt={product.product_name} onClick={() => setFullScreenImage(product.image_1)} className="w-12 h-12 object-cover rounded border border-gray-300 shadow-sm mx-auto cursor-pointer hover:opacity-75 transition hover:scale-105" title="Click to expand image" />
-                      ) : (
-                        <div className="w-12 h-12 bg-gray-100 flex items-center justify-center rounded border border-gray-200 mx-auto"><FiImage className="text-gray-400" size={20} /></div>
-                      )}
-                    </td>
-                    <td className="p-4">
-                      <div className="font-mono text-indigo-600 font-semibold">{product.product_id}</div>
-                      <div className="text-xs text-gray-500 mt-1">{product.part_number || "No Part #"}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="font-bold text-gray-900 whitespace-normal min-w-[200px]">{product.product_name}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">{product.brand || "Generic"} | {product.category}</div>
-                    </td>
-                    <td className="p-4">
-                      <div className="text-gray-700 font-medium">{product.source}</div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] mt-1 font-bold uppercase tracking-wider inline-block ${product.product_status === 'Active' ? 'bg-emerald-100 text-emerald-700' : product.product_status === 'Damaged' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{product.product_status}</span>
-                    </td>
-                    <td className="p-4 font-semibold text-emerald-600">{parseFloat(product.purchase_cost_bdt || 0).toFixed(2)}</td>
-                    <td className="p-4 font-semibold text-cyan-600">{parseFloat(product.retail_price_bdt || 0).toFixed(2)}</td>
-                    <td className="p-4">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => setSelectedProduct(product)} className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition" title="View Full Details"><FiEye size={18} /></button>
-                        <button onClick={() => navigate(`/dashboard/products/edit/${product.id}`)} className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg border border-indigo-200 transition" title="Edit Product"><FiEdit2 size={18} /></button>
-                        <button onClick={() => handleDelete(product.id)} className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition" title="Delete Product"><FiTrash2 size={18} /></button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              visibleProducts.map((product) => (
+                <tr key={product.id} className="hover:bg-gray-50 transition items-center">
+                  <td className="p-4">
+                    {product.image_1 ? (
+                      <img src={product.image_1} alt={product.product_name} onClick={() => setFullScreenImage(product.image_1)} className="w-12 h-12 object-cover rounded border border-gray-300 shadow-sm mx-auto cursor-pointer hover:opacity-75 transition hover:scale-105" title="Click to expand image" />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-100 flex items-center justify-center rounded border border-gray-200 mx-auto"><FiImage className="text-gray-400" size={20} /></div>
+                    )}
+                  </td>
+                  <td className="p-4">
+                    <div className="font-mono text-indigo-600 font-semibold">{product.product_id}</div>
+                    <div className="text-xs text-gray-500 mt-1">{product.part_number || "No Part #"}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="font-bold text-gray-900 whitespace-normal min-w-[200px]">{product.product_name}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{getBrandName(product.brand)} | {product.category || "No Category"}</div>
+                  </td>
+                  <td className="p-4">
+                    <div className="text-gray-700 font-medium">{product.source}</div>
+                    <span className={`px-2 py-0.5 rounded text-[10px] mt-1 font-bold uppercase tracking-wider inline-block ${product.product_status === 'Active' ? 'bg-emerald-100 text-emerald-700' : product.product_status === 'Damaged' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>{product.product_status}</span>
+                  </td>
+                  <td className="p-4 font-semibold text-emerald-600">{parseFloat(product.purchase_cost_bdt || 0).toFixed(2)}</td>
+                  <td className="p-4 font-semibold text-cyan-600">{parseFloat(product.retail_price_bdt || 0).toFixed(2)}</td>
+                  <td className="p-4">
+                    <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => setSelectedProduct(product)} className="p-2.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition" title="View Full Details"><FiEye size={18} /></button>
+                      <button onClick={() => navigate(`/dashboard/products/edit/${product.id}`)} className="p-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg border border-indigo-200 transition" title="Edit Product"><FiEdit2 size={18} /></button>
+                      <button onClick={() => handleDelete(product.id)} className="p-2.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg border border-red-200 transition" title="Delete Product"><FiTrash2 size={18} /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Slide-out Detail Modal (Responsive inner grids) */}
+      {/* LOAD MORE BUTTON */}
+      {visibleCount < filteredProducts.length && (
+        <div className="flex justify-center mt-4">
+          <button 
+            onClick={() => setVisibleCount((prev) => prev + 20)}
+            className="px-6 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg transition shadow-sm border border-gray-300"
+          >
+            Load 20 More Products ({filteredProducts.length - visibleCount} remaining)
+          </button>
+        </div>
+      )}
+
+      {/* Slide-out Detail Modal */}
       {selectedProduct && (
         <div className="fixed inset-0 bg-black/60 flex justify-end z-50 transition-opacity backdrop-blur-sm px-0 sm:px-0">
           <div className="w-full max-w-3xl bg-white h-full p-4 sm:p-6 shadow-2xl border-l border-gray-200 overflow-y-auto text-gray-800 animate-slide-in-right">
@@ -218,12 +288,11 @@ export default function ProductList() {
             </div>
 
             <div className="space-y-6">
-              {/* Stack grids on mobile: grid-cols-1 sm:grid-cols-2 etc. */}
               <section>
                 <h4 className="text-xs uppercase font-bold text-gray-500 mb-3 border-b border-gray-200 pb-1">Core Identification</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
                   <div><span className="block text-[10px] text-gray-500 uppercase">Part Number</span><span className="font-mono font-medium text-gray-900 break-words">{selectedProduct.part_number}</span></div>
-                  <div><span className="block text-[10px] text-gray-500 uppercase">Brand</span><span className="font-bold text-gray-900 break-words">{selectedProduct.brand || "N/A"}</span></div>
+                  <div><span className="block text-[10px] text-gray-500 uppercase">Brand</span><span className="font-bold text-gray-900 break-words">{getBrandName(selectedProduct.brand)}</span></div>
                   <div><span className="block text-[10px] text-gray-500 uppercase">Category</span><span className="text-gray-900 break-words">{selectedProduct.category || "N/A"}</span></div>
                   <div><span className="block text-[10px] text-gray-500 uppercase">Barcode (EAN-13)</span><span className="font-mono text-gray-900 break-words">{selectedProduct.barcode || "N/A"}</span></div>
                   <div><span className="block text-[10px] text-gray-500 uppercase">Primary Unit</span><span className="text-gray-900">{selectedProduct.unit}</span></div>
@@ -304,7 +373,6 @@ export default function ProductList() {
       {fullScreenImage && (
         <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex justify-center items-center p-2 sm:p-8 transition-opacity" onClick={() => setFullScreenImage(null)}>
           <div className="relative w-full h-full flex justify-center items-center group">
-            {/* Made the close button much more prominent for mobile tapping */}
             <button onClick={(e) => { e.stopPropagation(); setFullScreenImage(null); }} className="absolute top-4 right-4 sm:top-6 sm:right-6 bg-red-600/90 hover:bg-red-700 text-white p-3 sm:p-4 rounded-full transition-all shadow-xl z-10" title="Close Image">
               <FiX size={24} />
             </button>
