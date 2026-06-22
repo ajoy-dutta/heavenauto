@@ -23,6 +23,7 @@ def master_api_root(request):
         "5. Stock / Inventory API": request.build_absolute_uri('/api/stock/'),
         "6. Brand API": request.build_absolute_uri('/api/brand/'),
         "7. Supplier API": request.build_absolute_uri('/api/supplier/'),
+        "8. Payment API": request.build_absolute_uri('/api/payment/'),
     })
 
 urlpatterns = [
@@ -40,7 +41,8 @@ urlpatterns = [
     path('api/sale/', include('sale.urls')),
     path('api/stock/', include('stock.urls')),
     path('api/brand/', include('brand.urls')),
-    path('api/supplier/', include('supplier.urls')),   
+    path('api/supplier/', include('supplier.urls')),
+    path('api/payment/', include('payment.urls')),   
 
     # Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

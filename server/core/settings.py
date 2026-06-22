@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     'stock',
     'brand',
     'supplier',
+    'payment',
 
 ]
 

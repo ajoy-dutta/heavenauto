@@ -14,7 +14,8 @@ import {
   FiX,
   FiTruck,
   FiPieChart,
-  FiLayers 
+  FiLayers,
+  FiCreditCard // <-- Added icon for Payments
 } from "react-icons/fi";
 import logo from "../assets/logo.jpg";
 
@@ -54,6 +55,14 @@ export default function AdminSidebar() {
       subItems: [
         { to: "/dashboard/purchase/add", label: "New Purchase", icon: FiPlus },
         { to: "/dashboard/purchase", label: "Purchase History", icon: FiList },
+      ]
+    },
+    // --- NEW PAYMENTS DROPDOWN ---
+    { 
+      id: "payments", type: "dropdown", label: "Payments", icon: FiCreditCard, stateKey: "payments",
+      subItems: [
+        { to: "/dashboard/payments", label: "Payment Center", icon: FiDollarSign },
+        { to: "/dashboard/payment-history", label: "Payment Ledger", icon: FiList },
       ]
     },
     { id: "stock", type: "link", to: "/dashboard/stock", label: "Live Stock", icon: FiBox },

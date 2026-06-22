@@ -52,6 +52,7 @@ export default function PurchaseHistory() {
       id: purchase.id,
       supplier: purchase.supplier || "",
       entry_by: purchase.entry_by || "",
+      payment_status: purchase.payment_status || "Unpaid", // Added Payment Status
       invoice_number: purchase.invoice_number || "",
       remarks: purchase.remarks || "",
       po_number: purchase.po_number
@@ -69,7 +70,7 @@ export default function PurchaseHistory() {
     setEditLoading(true);
 
     try {
-      // We use PATCH to only update the header info (invoice, remarks, supplier)
+      // We use PATCH to only update the header info (invoice, remarks, supplier, status)
       await axiosInstance.patch(`purchase/purchases/${editFormData.id}/`, editFormData);
       fetchData(); // Refresh the list
       setIsEditModalOpen(false);
@@ -166,6 +167,7 @@ export default function PurchaseHistory() {
                   <th className="p-3 font-bold">PO & Date</th>
                   <th className="p-3 font-bold">Supplier Info</th>
                   <th className="p-3 font-bold">Items Summary</th>
+                  <th className="p-3 font-bold">Status</th> {/* ADDED STATUS HEADER */}
                   <th className="p-3 font-bold text-right">Total Amount (৳)</th>
                   <th className="p-3 font-bold text-center">Actions</th>
                 </tr>
@@ -192,6 +194,18 @@ export default function PurchaseHistory() {
                           {purchase.items?.map(i => i.product_name).join(', ')}
                         </div>
                       </td>
+                      
+                      {/* ADDED STATUS BADGE */}
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
+                          purchase.payment_status === 'Paid' ? 'bg-green-100 text-green-700' :
+                          purchase.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' :
+                          'bg-red-100 text-red-700'
+                        }`}>
+                          {purchase.payment_status || "Unpaid"}
+                        </span>
+                      </td>
+
                       <td className="p-3 text-right font-bold text-gray-900">
                         {parseFloat(purchase.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                       </td>
@@ -217,7 +231,8 @@ export default function PurchaseHistory() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan="5" className="p-8 text-center text-gray-500 text-sm">
+                    {/* Updated colSpan from 5 to 6 to account for the new Status column */}
+                    <td colSpan="6" className="p-8 text-center text-gray-500 text-sm">
                       No purchase records found.
                     </td>
                   </tr>
@@ -267,7 +282,6 @@ export default function PurchaseHistory() {
                         <tr key={idx} className="hover:bg-gray-50">
                           <td className="p-2">
                             <div className="text-gray-800 font-medium">{item.product_name}</div>
-                            {/* NEW: Displays the brand name below the product name */}
                             <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">
                               {getBrandName(item)}
                             </div>
@@ -322,7 +336,21 @@ export default function PurchaseHistory() {
                       className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     />
                   </div>
+                  
+                  {/* ADDED PAYMENT STATUS DROPDOWN */}
                   <div>
+                    <label className="block text-xs font-bold text-gray-600 mb-1">Payment Status</label>
+                    <select
+                      name="payment_status" value={editFormData.payment_status} onChange={handleEditChange}
+                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                    >
+                      <option value="Paid">Paid</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Unpaid">Unpaid</option>
+                    </select>
+                  </div>
+
+                  <div className="md:col-span-2">
                     <label className="block text-xs font-bold text-gray-600 mb-1">Remarks / Notes</label>
                     <input
                       type="text" name="remarks" value={editFormData.remarks} onChange={handleEditChange}

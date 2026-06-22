@@ -21,6 +21,8 @@ import AddPurchase from './pages/admin/purchase/AddPurchase';
 import StockList from './pages/admin/stock/StockList';
 import SaleHistory from './pages/admin/sales/SaleHistory';
 import AddSale from './pages/admin/sales/AddSale';
+import Payments from './pages/admin/payment/Payments';
+import PaymentHistory from './pages/admin/payment/PaymentHistory';
 
 // Finance Pages
 import FinancialDashboard from "./pages/admin/finance/FinancialDashboard";
@@ -77,7 +79,11 @@ export const router = createBrowserRouter([
 
       // Master Data Routes
       { path: "brands", element: <Brand /> },
-      { path: "suppliers", element: <Supplier /> }
+      { path: "suppliers", element: <Supplier /> }, // <-- ADDED COMMA HERE
+
+      // Payment Routes
+      { path: "payments", element: <Payments /> },
+      { path: "payment-history", element: <PaymentHistory /> } // <-- ADD THIS
     ],
   },
 ]);

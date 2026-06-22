@@ -284,7 +284,7 @@ export default function AddSale() {
               name="customer" value={orderData.customer} onChange={handleOrderChange}
               className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-green-500 outline-none bg-white"
             >
-              <option value="">-- Walk-in Customer --</option>
+              <option value=""> Select Customer </option>
               {customers.map(c => (
                 <option key={c.id} value={c.id}>
                   {c.shop_name ? `${c.shop_name} (${c.proprietor_name})` : c.proprietor_name}
