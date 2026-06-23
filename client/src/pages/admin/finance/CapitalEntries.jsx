@@ -112,9 +112,9 @@ export default function CapitalEntries() {
   if (loading) return <div className="p-4 text-gray-600">Loading finance data...</div>;
 
   return (
-    <div className="max-w-7xl mx-auto p-2 md:p-4 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="mb-4">
+    <div className="max-w-7xl mx-auto md:p-4 pb-6 bg-gray-50 min-h-screen">
+      {/* Header - added px-4 for mobile to align with edge-to-edge layout */}
+      <div className="mb-2 md:mb-4 pt-4 md:pt-0 px-4 md:px-0">
         <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
           <FiDollarSign className="text-blue-600" />
           Capital & Investments
@@ -122,15 +122,18 @@ export default function CapitalEntries() {
       </div>
 
       {error && (
-        <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded">
+        <div className="mb-3 mx-4 md:mx-0 p-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded">
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Changed to flex-col on mobile, grid on lg */}
+      <div className="flex flex-col lg:grid lg:grid-cols-3 gap-3 md:gap-4">
+        
         {/* --- FORM COLUMN --- */}
         <div className="lg:col-span-1">
-          <div className="bg-white rounded shadow-sm border border-gray-200 p-4">
+          {/* Removed padding/borders/shadows on mobile, kept them on md+ */}
+          <div className="bg-white md:rounded md:shadow-sm md:border border-gray-200 p-4 border-y md:border-y-0">
             <h2 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2 border-b pb-2">
               <FiPlus /> New Capital Entry
             </h2>
@@ -185,8 +188,8 @@ export default function CapitalEntries() {
                 />
               </div>
 
-              {/* Amount & Date */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Amount & Date - Stack on extra small mobile, split on sm+ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-gray-600 text-xs font-semibold mb-1">Amount (BDT)</label>
                   <input
@@ -232,7 +235,7 @@ export default function CapitalEntries() {
               {/* CONDITIONAL: Bank Details */}
               {formData.payment_method === 'Bank' && (
                 <div className="p-3 bg-blue-50 border border-blue-100 rounded-md space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-blue-800 text-[11px] font-semibold mb-1">Bank Name</label>
                       <input type="text" name="bank_name" value={formData.bank_name} onChange={handleInputChange} placeholder="e.g. BRAC Bank" className="w-full bg-white border border-blue-200 rounded p-1.5 text-sm text-gray-800 outline-none focus:border-blue-500" />
@@ -252,7 +255,7 @@ export default function CapitalEntries() {
               {/* CONDITIONAL: MFS Details */}
               {formData.payment_method === 'MFS' && (
                 <div className="p-3 bg-purple-50 border border-purple-100 rounded-md space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="block text-purple-800 text-[11px] font-semibold mb-1">Provider</label>
                       <select name="mfs_provider" value={formData.mfs_provider} onChange={handleInputChange} className="w-full bg-white border border-purple-200 rounded p-1.5 text-sm text-gray-800 outline-none focus:border-purple-500">
@@ -293,7 +296,7 @@ export default function CapitalEntries() {
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm transition flex justify-center items-center gap-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 md:py-2 rounded text-sm transition flex justify-center items-center gap-2"
               >
                 <FiSave />
                 {isSubmitting ? "Saving..." : "Record Capital"}
@@ -304,14 +307,15 @@ export default function CapitalEntries() {
 
         {/* --- LIST COLUMN --- */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded shadow-sm border border-gray-200 overflow-hidden h-full flex flex-col">
+          {/* Flush edge-to-edge on mobile */}
+          <div className="bg-white md:rounded md:shadow-sm border-y md:border border-gray-200 overflow-hidden h-full flex flex-col mt-1 md:mt-0">
             <div className="p-3 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h2 className="text-sm font-semibold text-gray-700 flex items-center gap-2">
                 <FiList /> Transaction History
               </h2>
             </div>
             
-            <div className="overflow-x-auto flex-1">
+            <div className="overflow-x-auto flex-1 w-full">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-blue-50 text-blue-800 text-xs uppercase border-b border-blue-100">
                   <tr>
@@ -372,7 +376,7 @@ export default function CapitalEntries() {
                         <td className="py-1.5 px-3 text-center">
                           <button
                             onClick={() => handleDelete(entry.id)}
-                            className="text-gray-400 hover:text-red-500 transition p-1"
+                            className="text-gray-400 hover:text-red-500 transition p-2 md:p-1"
                             title="Delete Record"
                           >
                             <FiTrash2 />
@@ -391,10 +395,11 @@ export default function CapitalEntries() {
       {/* --- ADD CATEGORY MODAL --- */}
       {showCatModal && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
+          {/* Expanded modal width slightly on mobile, max-w handles desktop */}
           <div className="bg-white rounded-lg shadow-xl w-full max-w-sm overflow-hidden">
             <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Add New Category</h3>
-              <button onClick={() => setShowCatModal(false)} className="text-gray-500 hover:text-red-500"><FiX /></button>
+              <button onClick={() => setShowCatModal(false)} className="text-gray-500 hover:text-red-500 p-1"><FiX size={20} /></button>
             </div>
             <form onSubmit={handleCatSubmit} className="p-4 space-y-3">
               <div>
@@ -420,7 +425,7 @@ export default function CapitalEntries() {
                   placeholder="Additional rules or terms for this category..."
                 ></textarea>
               </div>
-              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded text-sm">
+              <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 md:py-2 rounded text-sm mt-2">
                 Save Category
               </button>
             </form>
@@ -434,9 +439,9 @@ export default function CapitalEntries() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden max-h-[80vh] flex flex-col">
             <div className="p-3 border-b border-gray-200 flex justify-between items-center bg-gray-50">
               <h3 className="font-bold text-gray-800">Capital Categories Master</h3>
-              <button onClick={() => setShowCatListModal(false)} className="text-gray-500 hover:text-red-500"><FiX size={18} /></button>
+              <button onClick={() => setShowCatListModal(false)} className="text-gray-500 hover:text-red-500 p-1"><FiX size={20} /></button>
             </div>
-            <div className="p-0 overflow-y-auto flex-1">
+            <div className="p-0 overflow-y-auto flex-1 w-full">
               <table className="w-full text-left text-sm">
                 <thead className="bg-blue-50 text-blue-800 text-xs sticky top-0 border-b border-blue-100">
                   <tr>
