@@ -50,6 +50,8 @@ INSTALLED_APPS = [
     'brand',
     'supplier',
     'payment',
+    'capital',
+    'expense',
 
 ]
 

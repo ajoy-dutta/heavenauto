@@ -24,6 +24,8 @@ def master_api_root(request):
         "6. Brand API": request.build_absolute_uri('/api/brand/'),
         "7. Supplier API": request.build_absolute_uri('/api/supplier/'),
         "8. Payment API": request.build_absolute_uri('/api/payment/'),
+        "9. Capital API": request.build_absolute_uri('/api/capital/'),
+        "10. Expense API": request.build_absolute_uri('/api/expense/'),  # <-- ADDED HERE
     })
 
 urlpatterns = [
@@ -34,7 +36,7 @@ urlpatterns = [
     path('', master_api_root, name='master-api-root'),
     path('api/', master_api_root, name='api-root'),
     
-    # Your modular app routes remain exactly the same
+    # Your modular app routes
     path('api/person/', include('person.urls')),
     path('api/products/', include('products.urls')),
     path('api/purchase/', include('purchase.urls')),
@@ -42,7 +44,9 @@ urlpatterns = [
     path('api/stock/', include('stock.urls')),
     path('api/brand/', include('brand.urls')),
     path('api/supplier/', include('supplier.urls')),
-    path('api/payment/', include('payment.urls')),   
+    path('api/payment/', include('payment.urls')), 
+    path('api/capital/', include('capital.urls')),
+    path('api/expense/', include('expense.urls')),
 
     # Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
