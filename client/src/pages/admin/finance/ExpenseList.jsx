@@ -186,7 +186,7 @@ export default function ExpenseList() {
         await axiosInstance.post("expense/expenses/", payload);
       }
       
-      await fetchExpenses(); // Refresh list to get new DB format (like IDs & names)
+      await fetchExpenses();
       closeFormModal();
     } catch (err) {
       setFormError(err.response?.data?.detail || "Failed to save expense.");
@@ -211,10 +211,10 @@ export default function ExpenseList() {
   if (loading) return <div className="p-4 text-gray-600 text-center text-sm font-semibold">Loading Expense Ledger...</div>;
 
   return (
-    <div className="p-3 md:p-5 bg-gray-50 min-h-screen text-gray-800">
+    <div className="p-0 sm:p-5 bg-gray-50 min-h-screen text-gray-800">
       
       {/* Header Area */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-5 gap-3">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center my-4 sm:mb-5 gap-3 px-3 sm:px-0">
         <div>
           <h1 className="text-xl md:text-2xl font-black text-gray-900 flex items-center gap-2 tracking-tight">
             <FiDollarSign className="text-blue-600" /> Expense Ledger
@@ -224,76 +224,84 @@ export default function ExpenseList() {
         
         <button
           onClick={openAddModal}
-          className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md text-sm transition shadow-md hover:shadow-lg flex items-center gap-2"
+          className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-5 rounded-md text-sm transition shadow-md hover:shadow-lg flex items-center justify-center gap-2"
         >
           <FiPlus /> Record Expense
         </button>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-600 p-3 text-sm rounded mb-4 shadow-sm">{error}</div>}
+      {error && <div className="mx-3 sm:mx-0 bg-red-50 border border-red-200 text-red-600 p-3 text-sm rounded mb-4 shadow-sm">{error}</div>}
 
       {/* Categorized Expense Tables */}
       {expenses.length === 0 ? (
-        <div className="bg-white p-10 text-center text-gray-400 rounded-xl border border-gray-200 text-sm shadow-sm font-medium">
+        <div className="mx-3 sm:mx-0 bg-white p-10 text-center text-gray-400 rounded-xl border border-gray-200 text-sm shadow-sm font-medium">
           No expenses recorded yet.
         </div>
       ) : (
         Object.entries(groupedExpenses).map(([category, catExpenses]) => (
-          <div key={category} className="mb-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+          <div key={category} className="mb-6 bg-white sm:rounded-xl sm:shadow-sm border-y sm:border border-gray-200 overflow-hidden">
             
             {/* Category Header */}
-            <div className="bg-gradient-to-r from-gray-50 to-white px-4 py-3 border-b border-gray-200 flex justify-between items-center">
-               <h2 className="font-bold text-gray-800 text-sm tracking-wide">{category} Expenses</h2>
-               <span className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-full shadow-sm">
+            <div className="bg-gradient-to-r from-gray-50 to-white px-3 sm:px-4 py-2.5 sm:py-3 border-b border-gray-200 flex justify-between items-center">
+               <h2 className="font-bold text-gray-800 text-xs sm:text-sm tracking-wide">{category} Expenses</h2>
+               <span className="text-[9px] sm:text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-full shadow-sm">
                  {catExpenses.length} Records
                </span>
             </div>
 
-            {/* Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm text-gray-600">
-                <thead className="bg-gray-50/50 border-b border-gray-100 text-xs text-gray-500 uppercase font-semibold">
+            {/* Responsive Table Context (No containers / No horizontal scroll) */}
+            <div className="w-full overflow-hidden">
+              <table className="w-full text-left border-collapse border border-gray-200 table-fixed sm:table-auto">
+                <thead className="bg-gray-50/50 text-[9px] sm:text-xs text-gray-500 uppercase font-bold">
                   <tr>
-                    <th className="px-4 py-3">Date</th>
-                    <th className="px-4 py-3">ID</th>
-                    <th className="px-4 py-3">Sub-Category</th>
-                    <th className="px-4 py-3 text-right">Amount (৳)</th>
-                    <th className="px-4 py-3">Method</th>
-                    <th className="px-4 py-3 text-center">Actions</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 w-[16%] sm:w-auto">Date</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 w-[13%] sm:w-auto">ID</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 w-[28%] sm:w-auto">Sub-Category</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 text-right w-[20%] sm:w-auto">Amt (৳)</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 w-[11%] sm:w-auto">Method</th>
+                    <th className="border border-gray-200 px-1 sm:px-4 py-2 text-center w-[12%] sm:w-auto">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {catExpenses.map((expense) => (
-                    <tr key={expense.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition duration-150">
-                      <td className="px-4 py-2.5 whitespace-nowrap text-xs font-medium text-gray-500">{expense.expense_date}</td>
-                      <td className="px-4 py-2.5 font-bold text-gray-800 text-xs">{expense.expense_id}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-600">{expense.sub_category}</td>
-                      <td className="px-4 py-2.5 text-right font-black text-red-600 text-sm">
+                    <tr key={expense.id} className="hover:bg-blue-50/30 transition duration-150">
+                      <td className="border border-gray-200 px-1 py-1.5 sm:px-4 sm:py-2.5 text-[10px] sm:text-xs font-medium text-gray-500 break-words">
+                        {expense.expense_date ? expense.expense_date.split('-').slice(1).join('/') : "N/A"}
+                      </td>
+                      <td className="border border-gray-200 px-1 py-1.5 sm:px-4 sm:py-2.5 font-bold text-gray-800 text-[10px] sm:text-xs break-all">
+                        {expense.expense_id ? expense.expense_id.replace("EXP-", "") : ""}
+                      </td>
+                      <td className="border border-gray-200 px-1 py-1.5 sm:px-4 sm:py-2.5 text-[10px] sm:text-xs text-gray-600 line-clamp-2 sm:line-clamp-none break-words">
+                        {expense.sub_category}
+                      </td>
+                      <td className="border border-gray-200 px-1 py-1.5 sm:px-4 sm:py-2.5 text-right font-black text-red-600 text-[11px] sm:text-sm whitespace-nowrap">
                         {parseFloat(expense.amount).toLocaleString()}
                       </td>
-                      <td className="px-4 py-2.5 text-xs text-gray-500 font-medium">{expense.payment_method}</td>
-                      <td className="px-4 py-2.5 text-center">
-                        <div className="flex items-center justify-center gap-1.5">
+                      <td className="border border-gray-200 px-1 py-1.5 sm:px-4 sm:py-2.5 text-[9px] sm:text-xs text-gray-500 font-medium break-words">
+                        {expense.payment_method}
+                      </td>
+                      <td className="border border-gray-200 px-0.5 py-1.5 sm:px-4 sm:py-2.5 text-center">
+                        <div className="flex items-center justify-center gap-0.5 sm:gap-1.5">
                           <button 
                             onClick={() => setSelectedExpense(expense)}
-                            className="p-1.5 bg-gray-50 text-gray-600 hover:bg-blue-100 hover:text-blue-700 rounded-md transition" 
+                            className="p-1 bg-gray-50 text-gray-600 hover:bg-blue-100 hover:text-blue-700 rounded transition" 
                             title="View Details"
                           >
-                            <FiEye size={15} />
+                            <FiEye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </button>
                           <button 
                             onClick={() => openEditModal(expense)}
-                            className="p-1.5 bg-gray-50 text-gray-600 hover:bg-amber-100 hover:text-amber-700 rounded-md transition" 
+                            className="p-1 bg-gray-50 text-gray-600 hover:bg-amber-100 hover:text-amber-700 rounded transition" 
                             title="Edit"
                           >
-                            <FiEdit2 size={15} />
+                            <FiEdit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </button>
                           <button 
                             onClick={() => handleDelete(expense.id)}
-                            className="p-1.5 bg-gray-50 text-gray-600 hover:bg-red-100 hover:text-red-700 rounded-md transition" 
+                            className="p-1 bg-gray-50 text-gray-600 hover:bg-red-100 hover:text-red-700 rounded transition" 
                             title="Delete"
                           >
-                            <FiTrash2 size={15} />
+                            <FiTrash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           </button>
                         </div>
                       </td>
@@ -308,11 +316,11 @@ export default function ExpenseList() {
 
       {/* --- FORM MODAL (ADD / EDIT) --- */}
       {isFormModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[95vh] animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white sm:rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col h-full sm:h-auto max-h-[100vh] sm:max-h-[95vh] animate-in fade-in slide-in-from-bottom-8 sm:zoom-in-95 duration-200">
             
-            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
-              <h2 className="text-lg font-black text-gray-800 flex items-center gap-2">
+            <div className="px-5 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 sm:rounded-t-2xl">
+              <h2 className="text-base sm:text-lg font-black text-gray-800 flex items-center gap-2">
                 <FiDollarSign className="text-blue-600" /> 
                 {modalMode === 'add' ? 'Record New Expense' : 'Edit Expense Record'}
               </h2>
@@ -321,13 +329,13 @@ export default function ExpenseList() {
               </button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1">
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
               {formError && <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-600 rounded-md text-sm font-medium">{formError}</div>}
 
-              <form id="expenseForm" onSubmit={handleFormSubmit} className="space-y-6">
+              <form id="expenseForm" onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-6">
                 
                 {/* Section 1: Categorization */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Main Category *</label>
                     <select
@@ -356,7 +364,7 @@ export default function ExpenseList() {
 
                 {/* Conditional Salary Details */}
                 {formData.main_category === 'Salary' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 p-4 bg-blue-50/50 border border-blue-100 rounded-xl">
                     <div>
                       <label className="block text-xs font-bold text-blue-800 uppercase tracking-wider mb-1.5">Select Employee *</label>
                       <select
@@ -384,7 +392,7 @@ export default function ExpenseList() {
                 )}
 
                 {/* Section 2: Financial Details */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 pt-2 border-t border-gray-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5 pt-2 border-t border-gray-100">
                   <div>
                     <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">Method *</label>
                     <select
@@ -440,7 +448,7 @@ export default function ExpenseList() {
 
                 {/* Conditional Bank Details */}
                 {isBank && (
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-50 border border-gray-200 rounded-xl">
                     <div>
                       <label className="block text-xs font-bold text-gray-500 mb-1">Bank Name</label>
                       <input type="text" name="bank_name" value={formData.bank_name} onChange={handleFormChange} className="w-full border border-gray-300 rounded p-2 focus:border-blue-500 outline-none text-sm bg-white" placeholder="City Bank" />
@@ -475,7 +483,7 @@ export default function ExpenseList() {
               </form>
             </div>
             
-            <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/50 rounded-b-2xl flex justify-end gap-3">
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/50 sm:rounded-b-2xl flex justify-end gap-3 pb-8 sm:pb-4">
               <button type="button" onClick={closeFormModal} className="px-5 py-2 rounded-lg text-sm font-bold text-gray-600 hover:bg-gray-200 transition">
                 Cancel
               </button>
@@ -491,8 +499,8 @@ export default function ExpenseList() {
 
       {/* --- VIEW DETAILS MODAL --- */}
       {selectedExpense && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-gray-900/60 backdrop-blur-sm">
+          <div className="bg-white sm:rounded-2xl shadow-2xl w-full max-w-sm md:max-w-md overflow-hidden flex flex-col h-auto max-h-[90vh] animate-in fade-in slide-in-from-bottom-8 duration-200">
             
             <div className="flex justify-between items-center px-5 py-4 border-b border-gray-100 bg-gray-50/50">
               <div>
@@ -538,7 +546,7 @@ export default function ExpenseList() {
               )}
             </div>
             
-            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+            <div className="px-5 py-4 border-t border-gray-100 bg-gray-50/50 flex justify-end pb-8 sm:pb-4">
                 <button onClick={() => setSelectedExpense(null)} className="px-5 py-2 bg-white border border-gray-200 hover:bg-gray-100 text-gray-700 text-sm font-bold rounded-lg transition shadow-sm">
                   Close
                 </button>
