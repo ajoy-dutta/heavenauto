@@ -1,169 +1,156 @@
 import { useState, useEffect } from "react";
 import axiosInstance from "../../../api/axios";
-import { FiDollarSign, FiTrendingUp, FiBox, FiActivity, FiArrowRight, FiArrowLeft } from "react-icons/fi";
+import { 
+  FiPieChart, 
+  FiTrendingUp, 
+  FiTrendingDown, 
+  FiDollarSign, 
+  FiBriefcase, 
+  FiShield 
+} from "react-icons/fi";
 
 export default function FinancialDashboard() {
-  const [accounts, setAccounts] = useState([]);
-  const [journalEntries, setJournalEntries] = useState([]);
+  const [stats, setStats] = useState({
+    revenue: 0,
+    expense: 0,
+    net_profit: 0,
+    assets: 0,
+    liabilities: 0,
+    equity: 0
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetchFinancialData();
+    fetchFinancialSummary();
   }, []);
 
-  const fetchFinancialData = async () => {
+  const fetchFinancialSummary = async () => {
     try {
-      // Fetch both Accounts and Recent Transactions simultaneously
-      const [accountsRes, entriesRes] = await Promise.all([
-        axiosInstance.get("account/accounts/"),
-        axiosInstance.get("account/journal-entries/")
-      ]);
-      
-      setAccounts(accountsRes.data);
-      setJournalEntries(entriesRes.data);
+      // Fetching the pre-calculated stats directly from our Account app
+      const response = await axiosInstance.get("account/summary/");
+      setStats(response.data);
       setLoading(false);
     } catch (err) {
-      setError("Failed to load financial data. Ensure Django is running.");
+      console.error(err);
+      setError("Failed to load financial statistics. Is the server running?");
       setLoading(false);
     }
   };
 
-  // Helper function to safely get the balance of a specific account code
-  const getBalance = (code) => {
-    const acc = accounts.find((a) => a.code === code);
-    return acc ? parseFloat(acc.balance) : 0;
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="text-emerald-600 font-bold animate-pulse">Loading Financial Data...</div>
+      </div>
+    );
+  }
+
+  // Format currency helper
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-BD', {
+      style: 'currency',
+      currency: 'BDT',
+      minimumFractionDigits: 2
+    }).format(amount || 0);
   };
 
-  if (loading) return <div className="text-gray-500 font-medium p-6 animate-pulse">Loading Financials...</div>;
-  if (error) return <div className="text-red-600 bg-red-50 border border-red-100 p-6 rounded-lg m-6">{error}</div>;
-
-  // --- Core Financial Calculations ---
-  // 1000: Cash | 1030: Inventory | 4000: Sales Revenue | 5000: COGS (if added)
-  const totalCash = getBalance("1000");
-  const totalInventory = getBalance("1030");
-  const totalRevenue = getBalance("4000");
-  
-  // If you later add a specific Expense/COGS account, you can subtract it here
-  const totalExpenses = getBalance("5000"); 
-  const netProfit = totalRevenue - totalExpenses;
-
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-8">
-      
+    <div className="p-6 w-full bg-slate-50 min-h-screen">
+      {error && (
+        <div className="mb-4 p-4 text-sm text-red-600 bg-red-100 rounded-lg shadow-sm border border-red-200">
+          {error}
+        </div>
+      )}
+
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Financial Overview</h1>
-        <p className="text-gray-500 mt-1">Real-time balances, automated by Heaven Autos ERP.</p>
+      <div className="mb-8">
+        <h1 className="text-2xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
+          <FiPieChart className="text-emerald-600" />
+          Financial Dashboard
+        </h1>
+        <p className="text-slate-500 text-sm font-medium mt-1">
+          Live overview of Heaven Autos' financial health, calculated directly from the master ledger.
+        </p>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        
-        {/* Cash Balance Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-4 bg-emerald-50 text-emerald-600 rounded-lg">
-            <FiDollarSign className="w-8 h-8" />
+      {/* Section 1: Income Statement (P&L) */}
+      <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">
+        Income Statement Overview
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+        {/* Revenue Card */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-lg">
+            <FiTrendingUp size={24} />
           </div>
           <div>
-            <p className="text-gray-500 text-sm font-medium">Available Cash</p>
-            <h3 className="text-2xl font-bold text-gray-900">{totalCash.toLocaleString()} BDT</h3>
+            <p className="text-sm font-semibold text-slate-500">Total Revenue</p>
+            <p className="text-2xl font-bold text-slate-800">{formatCurrency(stats.revenue)}</p>
           </div>
         </div>
 
-        {/* Inventory Value Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-4 bg-blue-50 text-blue-600 rounded-lg">
-            <FiBox className="w-8 h-8" />
+        {/* Expense Card */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4">
+          <div className="p-3 bg-red-100 text-red-600 rounded-lg">
+            <FiTrendingDown size={24} />
           </div>
           <div>
-            <p className="text-gray-500 text-sm font-medium">Total Inventory Value</p>
-            <h3 className="text-2xl font-bold text-gray-900">{totalInventory.toLocaleString()} BDT</h3>
-          </div>
-        </div>
-
-        {/* Sales Revenue Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-4 bg-amber-50 text-amber-600 rounded-lg">
-            <FiActivity className="w-8 h-8" />
-          </div>
-          <div>
-            <p className="text-gray-500 text-sm font-medium">Total Sales Revenue</p>
-            <h3 className="text-2xl font-bold text-gray-900">{totalRevenue.toLocaleString()} BDT</h3>
+            <p className="text-sm font-semibold text-slate-500">Total Expenses</p>
+            <p className="text-2xl font-bold text-slate-800">{formatCurrency(stats.expense)}</p>
           </div>
         </div>
 
         {/* Net Profit Card */}
-        <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
-          <div className="p-4 bg-indigo-50 text-indigo-600 rounded-lg">
-            <FiTrendingUp className="w-8 h-8" />
+        <div className={`p-6 rounded-xl border shadow-sm flex items-start gap-4 ${stats.net_profit >= 0 ? 'bg-emerald-600 border-emerald-700 text-white' : 'bg-red-600 border-red-700 text-white'}`}>
+          <div className={`p-3 rounded-lg ${stats.net_profit >= 0 ? 'bg-emerald-500/50' : 'bg-red-500/50'}`}>
+            <FiDollarSign size={24} />
           </div>
           <div>
-            <p className="text-gray-500 text-sm font-medium">Net Profit Margin</p>
-            <h3 className="text-2xl font-bold text-gray-900">{netProfit.toLocaleString()} BDT</h3>
+            <p className="text-sm font-semibold opacity-90">Net Profit / (Loss)</p>
+            <p className="text-3xl font-black">{formatCurrency(stats.net_profit)}</p>
           </div>
         </div>
       </div>
 
-      {/* Automated Ledger / Transaction History */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-gray-200">
-          <h2 className="text-xl font-bold text-gray-900">Recent Automated Transactions</h2>
-          <p className="text-sm text-gray-500 mt-1">Journal entries automatically generated by system actions.</p>
+      {/* Section 2: Balance Sheet Overview */}
+      <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 border-b pb-2">
+        Balance Sheet Health
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Assets */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+          <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
+            <FiBriefcase size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Total Assets</p>
+            <p className="text-xl font-bold text-slate-800">{formatCurrency(stats.assets)}</p>
+          </div>
         </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-gray-50 text-gray-600 border-b border-gray-200 font-semibold">
-                <th className="p-4">Date</th>
-                <th className="p-4">Description</th>
-                <th className="p-4">Debits / Credits</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {journalEntries.slice(0, 10).map((entry) => (
-                <tr key={entry.id} className="hover:bg-gray-50 transition bg-white">
-                  <td className="p-4 whitespace-nowrap text-gray-600">
-                    {entry.date}
-                  </td>
-                  <td className="p-4">
-                    <span className="font-medium text-gray-900">{entry.description}</span>
-                    <div className="text-xs text-gray-500 mt-1">
-                      {entry.purchase ? `Purchase ID: ${entry.purchase}` : entry.sale ? `Sale ID: ${entry.sale}` : "Manual Entry"}
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <div className="space-y-1.5">
-                      {entry.items.map((item) => (
-                        <div key={item.id} className="text-sm flex items-center gap-2 font-medium">
-                          {parseFloat(item.debit) > 0 ? (
-                            <span className="text-emerald-600 flex items-center gap-1">
-                              <FiArrowLeft className="w-3.5 h-3.5"/> + {item.debit} <span className="text-gray-500 font-normal ml-1">({item.account_name})</span>
-                            </span>
-                          ) : (
-                            <span className="text-red-600 flex items-center gap-1">
-                              <FiArrowRight className="w-3.5 h-3.5"/> - {item.credit} <span className="text-gray-500 font-normal ml-1">({item.account_name})</span>
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {journalEntries.length === 0 && (
-                <tr>
-                  <td colSpan="3" className="p-8 text-center text-gray-500 bg-white">
-                    No transactions yet. Go make a purchase or sale!
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+
+        {/* Liabilities */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+          <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
+            <FiShield size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Total Liabilities</p>
+            <p className="text-xl font-bold text-slate-800">{formatCurrency(stats.liabilities)}</p>
+          </div>
+        </div>
+
+        {/* Equity */}
+        <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex items-start gap-4 hover:shadow-md transition-shadow">
+          <div className="p-3 bg-indigo-100 text-indigo-600 rounded-lg">
+            <FiPieChart size={24} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-500">Owner's Equity</p>
+            <p className="text-xl font-bold text-slate-800">{formatCurrency(stats.equity)}</p>
+          </div>
         </div>
       </div>
-
     </div>
   );
 }

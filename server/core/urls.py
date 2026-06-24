@@ -25,7 +25,8 @@ def master_api_root(request):
         "7. Supplier API": request.build_absolute_uri('/api/supplier/'),
         "8. Payment API": request.build_absolute_uri('/api/payment/'),
         "9. Capital API": request.build_absolute_uri('/api/capital/'),
-        "10. Expense API": request.build_absolute_uri('/api/expense/'),  # <-- ADDED HERE
+        "10. Expense API": request.build_absolute_uri('/api/expense/'),
+        "11. Account API": request.build_absolute_uri('/api/account/'),
     })
 
 urlpatterns = [
@@ -47,6 +48,7 @@ urlpatterns = [
     path('api/payment/', include('payment.urls')), 
     path('api/capital/', include('capital.urls')),
     path('api/expense/', include('expense.urls')),
+    path('api/account/', include('account.urls')),
 
     # Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

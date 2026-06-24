@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'payment',
     'capital',
     'expense',
+    'account',
 
 ]
 
