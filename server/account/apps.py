@@ -5,4 +5,5 @@ class AccountConfig(AppConfig):
     name = 'account'
 
     def ready(self):
-        import account.signals  # This registers the listeners
+        # Imports the signals when the app starts
+        import account.signals

@@ -1,36 +1,52 @@
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from .models import Ledger, Account
-from sale.models import SaleOrder
-from purchase.models import PurchaseOrder
+from decimal import Decimal
+from capital.models import Capital
 from expense.models import Expense
+from payment.models import Payment
+from .models import Account, Ledger
 
-@receiver(post_save, sender=SaleOrder)
-def log_sale_to_ledger(sender, instance, created, **kwargs):
-    if created:
-        cash, _ = Account.objects.get_or_create(code='1000', defaults={'name': 'Cash', 'group': 'Asset'})
-        revenue, _ = Account.objects.get_or_create(code='4000', defaults={'name': 'Revenue', 'group': 'Revenue'})
-        
-        # Debit Cash, Credit Revenue
-        Ledger.objects.create(account=cash, content_type='Sale', object_id=instance.id, debit=instance.total_amount)
-        Ledger.objects.create(account=revenue, content_type='Sale', object_id=instance.id, credit=instance.total_amount)
+def get_account(code, name, group):
+    account, _ = Account.objects.get_or_create(
+        code=code, 
+        defaults={'name': name, 'group': group}
+    )
+    return account
 
-@receiver(post_save, sender=PurchaseOrder)
-def log_purchase_to_ledger(sender, instance, created, **kwargs):
+@receiver(post_save, sender=Capital)
+def create_capital_ledger(sender, instance, created, **kwargs):
     if created:
-        inventory, _ = Account.objects.get_or_create(code='1030', defaults={'name': 'Inventory', 'group': 'Asset'})
-        cash, _ = Account.objects.get_or_create(code='1000', defaults={'name': 'Cash', 'group': 'Asset'})
-        
-        # Debit Inventory, Credit Cash
-        Ledger.objects.create(account=inventory, content_type='Purchase', object_id=instance.id, debit=instance.total_amount)
-        Ledger.objects.create(account=cash, content_type='Purchase', object_id=instance.id, credit=instance.total_amount)
+        cash = get_account('1000', 'Cash & Bank Equivalents', 'Asset')
+        equity = get_account('3000', 'Owner Equity / Capital', 'Equity')
+        desc = f"Capital: {instance.source_name}"
+        Ledger.objects.create(account=cash, description=desc, content_type='Capital', object_id=instance.capital_id, debit=instance.amount)
+        Ledger.objects.create(account=equity, description=desc, content_type='Capital', object_id=instance.capital_id, credit=instance.amount)
 
 @receiver(post_save, sender=Expense)
-def log_expense_to_ledger(sender, instance, created, **kwargs):
+def create_expense_ledger(sender, instance, created, **kwargs):
     if created:
-        expense_acc, _ = Account.objects.get_or_create(code='5000', defaults={'name': 'Expenses', 'group': 'Expense'})
-        cash, _ = Account.objects.get_or_create(code='1000', defaults={'name': 'Cash', 'group': 'Asset'})
+        exp_acc = get_account('5000', 'Operating Expenses', 'Expense')
+        cash = get_account('1000', 'Cash & Bank Equivalents', 'Asset')
+        desc = f"Expense: {instance.main_category} - {instance.sub_category}"
+        Ledger.objects.create(account=exp_acc, description=desc, content_type='Expense', object_id=instance.expense_id, debit=instance.amount)
+        Ledger.objects.create(account=cash, description=desc, content_type='Expense', object_id=instance.expense_id, credit=instance.amount)
+
+@receiver(post_save, sender=Payment)
+def create_payment_ledger(sender, instance, created, **kwargs):
+    if created:
+        cash = get_account('1000', 'Cash & Bank Equivalents', 'Asset')
         
-        # Debit Expense, Credit Cash
-        Ledger.objects.create(account=expense_acc, content_type='Expense', object_id=instance.id, debit=instance.amount)
-        Ledger.objects.create(account=cash, content_type='Expense', object_id=instance.id, credit=instance.amount)
+        if instance.payment_type == 'IN':  # Sale Payment
+            rev = get_account('4000', 'Sales Revenue', 'Revenue')
+            # Use getattr to safely get ID/Number without crashing
+            order_ref = getattr(instance.sale, 'sale_id', getattr(instance.sale, 'id', 'Unknown'))
+            desc = f"Payment Recv: Sale #{order_ref}"
+            Ledger.objects.create(account=cash, description=desc, content_type='Payment-IN', object_id=instance.payment_id, debit=instance.amount)
+            Ledger.objects.create(account=rev, description=desc, content_type='Payment-IN', object_id=instance.payment_id, credit=instance.amount)
+            
+        elif instance.payment_type == 'OUT':  # Purchase Payment
+            inv = get_account('1020', 'Inventory / Purchases', 'Asset')
+            order_ref = getattr(instance.purchase, 'po_number', getattr(instance.purchase, 'id', 'Unknown'))
+            desc = f"Payment Paid: Purchase #{order_ref}"
+            Ledger.objects.create(account=inv, description=desc, content_type='Payment-OUT', object_id=instance.payment_id, debit=instance.amount)
+            Ledger.objects.create(account=cash, description=desc, content_type='Payment-OUT', object_id=instance.payment_id, credit=instance.amount)

@@ -1,12 +1,15 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import AccountViewSet, financial_summary
+from .views import AccountViewSet, LedgerViewSet, financial_summary
 
 router = DefaultRouter()
-router.register(r'accounts', AccountViewSet)
+router.register(r'accounts', AccountViewSet, basename='account')
+router.register(r'ledgers', LedgerViewSet, basename='ledger')
 
 urlpatterns = [
-    # Put the summary path BEFORE the router so it doesn't get confused with an ID lookup
+    # IMPORTANT: Put 'summary/' before the router so it gets matched correctly!
     path('summary/', financial_summary, name='financial-summary'),
+    
+    # Standard ViewSet routes
     path('', include(router.urls)),
 ]

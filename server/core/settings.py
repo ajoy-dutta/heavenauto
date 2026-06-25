@@ -52,7 +52,7 @@ INSTALLED_APPS = [
     'payment',
     'capital',
     'expense',
-    'account',
+    'account.apps.AccountConfig',
 
 ]
 

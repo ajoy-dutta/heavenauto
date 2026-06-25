@@ -3,23 +3,23 @@ from .models import Account, Ledger
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
-    # 'is_active' was removed because it wasn't in the latest model definition
-    list_display = ('code', 'name', 'group', 'opening_balance', 'current_balance')
-    list_filter = ('group',)
+    # Display the dynamic property in the list view
+    list_display = ('code', 'name', 'group', 'get_balance')
     search_fields = ('code', 'name')
-    ordering = ('code',)
+    list_filter = ('group',)
 
-    def current_balance(self, obj):
-        return obj.balance
-    
-    current_balance.short_description = 'Current Balance'
+    # Custom method to format the balance property for the admin panel
+    def get_balance(self, obj):
+        return f"৳ {obj.balance}"
+    get_balance.short_description = 'Live Balance'
 
 
 @admin.register(Ledger)
 class LedgerAdmin(admin.ModelAdmin):
-    # 'source_app' was updated to 'content_type' to match the model we defined
-    list_display = ('date', 'account', 'description', 'debit', 'credit', 'content_type')
-    list_filter = ('content_type', 'date', 'account__group')
-    search_fields = ('description', 'account__name', 'account__code', 'object_id')
-    autocomplete_fields = ('account',)
-    ordering = ('-date', '-id')
+    list_display = ('account', 'date', 'description', 'content_type', 'object_id', 'debit', 'credit')
+    list_filter = ('account', 'content_type', 'date')
+    search_fields = ('description', 'object_id', 'account__name', 'account__code')
+    readonly_fields = ('date',)
+    
+    # Optional: order by newest first
+    ordering = ('-date',)

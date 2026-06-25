@@ -1,52 +1,63 @@
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from decimal import Decimal
 
-from .models import Account
-from .serializers import AccountSerializer
-
+from .models import Account, Ledger
+from .serializers import AccountSerializer, LedgerSerializer
 
 class AccountViewSet(viewsets.ModelViewSet):
-    """
-    Handles full CRUD actions for the Chart of Accounts.
-    React reads from and writes to /api/account/accounts/
-    """
     queryset = Account.objects.all().order_by('code')
     serializer_class = AccountSerializer
 
+class LedgerViewSet(viewsets.ModelViewSet):
+    queryset = Ledger.objects.all().order_by('-date')
+    serializer_class = LedgerSerializer
+    filterset_fields = ['account', 'content_type', 'object_id']
 
 @api_view(['GET'])
 def financial_summary(request):
-    """
-    Calculates total balances grouped by account type directly from the database.
-    Offloads all math from the React frontend dashboard.
-    """
     accounts = Account.objects.all()
     
-    # Initialize totals tracking keys exactly matching your Account GROUP_CHOICES
-    totals = {
-        'Asset': Decimal('0.00'),
-        'Liability': Decimal('0.00'),
-        'Equity': Decimal('0.00'),
-        'Revenue': Decimal('0.00'),
-        'Expense': Decimal('0.00'),
+    # 1. Initialize master summary including new "Today" metrics
+    summary = {
+        'revenue': Decimal('0.00'),
+        'expense': Decimal('0.00'),
+        'assets': Decimal('0.00'),
+        'liabilities': Decimal('0.00'),
+        'equity': Decimal('0.00'),
+        'today_revenue': Decimal('0.00'),
+        'today_expense': Decimal('0.00'),
+        'today_capital': Decimal('0.00'),
     }
-    
-    # Accumulate running ledger calculations using the @property on the model
+
+    # 2. Lifetime Balances
     for acc in accounts:
-        if acc.group in totals:
-            totals[acc.group] += acc.balance
+        if acc.group == 'Revenue': summary['revenue'] += acc.balance
+        elif acc.group == 'Expense': summary['expense'] += acc.balance
+        elif acc.group == 'Asset': summary['assets'] += acc.balance
+        elif acc.group == 'Liability': summary['liabilities'] += acc.balance
+        elif acc.group == 'Equity': summary['equity'] += acc.balance
 
-    # Calculate Net Profit (Revenue - Expenses)
-    net_profit = totals['Revenue'] - totals['Expense']
+    summary['net_profit'] = summary['revenue'] - summary['expense']
 
-    # FIX: Corrected totals['Liabilities'] lookup to totals['Liability']
-    return Response({
-        'revenue': totals['Revenue'],
-        'expense': totals['Expense'],
-        'net_profit': net_profit,
-        'assets': totals['Asset'],
-        'liabilities': totals['Liability'],
-        'equity': totals['Equity']
-    })
+    # 3. Calculate "Today's" flow dynamically from the Ledger
+    # Get the start of today (Midnight)
+    today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    # Find all transactions that happened from midnight until right now
+    todays_ledgers = Ledger.objects.filter(date__gte=today_start)
+    
+    for ledger in todays_ledgers:
+        if ledger.account.group == 'Revenue':
+            # Revenue increases with credits
+            summary['today_revenue'] += (ledger.credit - ledger.debit)
+        elif ledger.account.group == 'Expense':
+            # Expense increases with debits
+            summary['today_expense'] += (ledger.debit - ledger.credit)
+        elif ledger.account.group == 'Equity':
+            # Equity/Capital increases with credits
+            summary['today_capital'] += (ledger.credit - ledger.debit)
+
+    return Response(summary)
