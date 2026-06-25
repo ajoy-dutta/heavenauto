@@ -99,116 +99,91 @@ const groupExpensesByCategory = (expenses) => {
 // Colors for pie chart
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#A569BD", "#F39C12"];
 
-// Colour mapping for card backgrounds, borders, hover backgrounds, and glow effects
-// Now using border-{color}-300 for better visibility and border-{color}-500 on hover
+// Colour mapping – now includes shadow/glow per colour
 const colorClasses = {
   indigo: {
     bg: "bg-indigo-50",
-    hoverBg: "hover:bg-indigo-200",
-    border: "border-indigo-300",
-    hoverBorder: "hover:border-indigo-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]",
+    hoverBg: "hover:bg-indigo-100",
     iconBg: "bg-indigo-100",
     iconText: "text-indigo-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]",
   },
   amber: {
     bg: "bg-amber-50",
-    hoverBg: "hover:bg-amber-200",
-    border: "border-amber-300",
-    hoverBorder: "hover:border-amber-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]",
+    hoverBg: "hover:bg-amber-100",
     iconBg: "bg-amber-100",
     iconText: "text-amber-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]",
   },
   cyan: {
     bg: "bg-cyan-50",
-    hoverBg: "hover:bg-cyan-200",
-    border: "border-cyan-300",
-    hoverBorder: "hover:border-cyan-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]",
+    hoverBg: "hover:bg-cyan-100",
     iconBg: "bg-cyan-100",
     iconText: "text-cyan-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]",
   },
   emerald: {
     bg: "bg-emerald-50",
-    hoverBg: "hover:bg-emerald-200",
-    border: "border-emerald-300",
-    hoverBorder: "hover:border-emerald-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]",
+    hoverBg: "hover:bg-emerald-100",
     iconBg: "bg-emerald-100",
     iconText: "text-emerald-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]",
   },
   blue: {
     bg: "bg-blue-50",
-    hoverBg: "hover:bg-blue-200",
-    border: "border-blue-300",
-    hoverBorder: "hover:border-blue-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]",
+    hoverBg: "hover:bg-blue-100",
     iconBg: "bg-blue-100",
     iconText: "text-blue-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]",
   },
   green: {
     bg: "bg-green-50",
-    hoverBg: "hover:bg-green-200",
-    border: "border-green-300",
-    hoverBorder: "hover:border-green-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]",
+    hoverBg: "hover:bg-green-100",
     iconBg: "bg-green-100",
     iconText: "text-green-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]",
   },
   rose: {
     bg: "bg-rose-50",
-    hoverBg: "hover:bg-rose-200",
-    border: "border-rose-300",
-    hoverBorder: "hover:border-rose-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(244,63,94,0.4)]",
+    hoverBg: "hover:bg-rose-100",
     iconBg: "bg-rose-100",
     iconText: "text-rose-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(244,63,94,0.4)]",
   },
   purple: {
     bg: "bg-purple-50",
-    hoverBg: "hover:bg-purple-200",
-    border: "border-purple-300",
-    hoverBorder: "hover:border-purple-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(168,85,247,0.4)]",
+    hoverBg: "hover:bg-purple-100",
     iconBg: "bg-purple-100",
     iconText: "text-purple-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(168,85,247,0.4)]",
   },
   red: {
     bg: "bg-red-50",
-    hoverBg: "hover:bg-red-200",
-    border: "border-red-300",
-    hoverBorder: "hover:border-red-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]",
+    hoverBg: "hover:bg-red-100",
     iconBg: "bg-red-100",
     iconText: "text-red-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]",
   },
   sky: {
     bg: "bg-sky-50",
-    hoverBg: "hover:bg-sky-200",
-    border: "border-sky-300",
-    hoverBorder: "hover:border-sky-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]",
+    hoverBg: "hover:bg-sky-100",
     iconBg: "bg-sky-100",
     iconText: "text-sky-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]",
   },
   violet: {
     bg: "bg-violet-50",
-    hoverBg: "hover:bg-violet-200",
-    border: "border-violet-300",
-    hoverBorder: "hover:border-violet-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]",
+    hoverBg: "hover:bg-violet-100",
     iconBg: "bg-violet-100",
     iconText: "text-violet-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]",
   },
   orange: {
     bg: "bg-orange-50",
-    hoverBg: "hover:bg-orange-200",
-    border: "border-orange-300",
-    hoverBorder: "hover:border-orange-500",
-    shadow: "hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]",
+    hoverBg: "hover:bg-orange-100",
     iconBg: "bg-orange-100",
     iconText: "text-orange-600",
+    shadow: "hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]",
   },
 };
 
@@ -436,7 +411,7 @@ export default function Dashboard() {
           return (
             <div
               key={idx}
-              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              className={`${classes.bg} ${classes.hoverBg} border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm ${classes.shadow} transition-all duration-300 transform hover:-translate-y-1`}
               style={{ animationDelay: `${idx * 100}ms` }}
             >
               <div className="flex justify-between items-start">
@@ -459,7 +434,7 @@ export default function Dashboard() {
         })}
       </div>
 
-      {/* Row 2: Financial Stats */}
+      {/* Row 2: Financial Stats with Links */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeInUp" style={{ animationDelay: "200ms" }}>
         {[
           {
@@ -467,31 +442,35 @@ export default function Dashboard() {
             value: formatCurrency(stats.totalSales),
             icon: FiDollarSign,
             color: "blue",
+            link: "/dashboard/sales",
           },
           {
             label: "Gross Profit",
             value: formatCurrency(stats.grossProfit),
             icon: FiTrendingUp,
             color: "green",
+            link: "/dashboard/sales",
           },
           {
             label: "Expenses",
             value: formatCurrency(stats.totalExpenses),
             icon: FiCreditCard,
             color: "rose",
+            link: "/dashboard/finance/expense",
           },
           {
             label: "Net Profit",
             value: formatCurrency(stats.netProfit),
             icon: FiPieChart,
             color: stats.netProfit >= 0 ? "purple" : "red",
+            link: "/dashboard/finance/dashboard",
           },
         ].map((card, idx) => {
           const classes = colorClasses[card.color];
           return (
             <div
               key={idx}
-              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              className={`${classes.bg} ${classes.hoverBg} border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm ${classes.shadow} transition-all duration-300 transform hover:-translate-y-1`}
               style={{ animationDelay: `${(idx + 2) * 100}ms` }}
             >
               <div className="flex justify-between items-start">
@@ -505,12 +484,18 @@ export default function Dashboard() {
                   <card.icon size={20} />
                 </div>
               </div>
+              <Link
+                to={card.link}
+                className={`text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors ${classes.iconText}`}
+              >
+                View <FiArrowRight size={12} />
+              </Link>
             </div>
           );
         })}
       </div>
 
-      {/* Row 3: Operational & Inventory */}
+      {/* Row 3: Operational & Inventory with Links */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeInUp" style={{ animationDelay: "400ms" }}>
         {[
           {
@@ -518,18 +503,21 @@ export default function Dashboard() {
             value: formatCurrency(stats.totalStockValue),
             icon: FiPackage,
             color: "amber",
+            link: "/dashboard/stock",
           },
           {
             label: "Purchases",
             value: formatCurrency(stats.totalPurchases),
             icon: FiShoppingCart,
             color: "sky",
+            link: "/dashboard/purchase",
           },
           {
             label: "Capital",
             value: formatCurrency(stats.totalCapital),
             icon: FiBriefcase,
             color: "violet",
+            link: "/dashboard/finance/capital-entries",
           },
           {
             label: "Suppliers",
@@ -543,7 +531,7 @@ export default function Dashboard() {
           return (
             <div
               key={idx}
-              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              className={`${classes.bg} ${classes.hoverBg} border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm ${classes.shadow} transition-all duration-300 transform hover:-translate-y-1`}
               style={{ animationDelay: `${(idx + 4) * 100}ms` }}
             >
               <div className="flex justify-between items-start">
@@ -557,14 +545,12 @@ export default function Dashboard() {
                   <card.icon size={20} />
                 </div>
               </div>
-              {card.link && (
-                <Link
-                  to={card.link}
-                  className={`text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors ${classes.iconText}`}
-                >
-                  View <FiArrowRight size={12} />
-                </Link>
-              )}
+              <Link
+                to={card.link}
+                className={`text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors ${classes.iconText}`}
+              >
+                View <FiArrowRight size={12} />
+              </Link>
             </div>
           );
         })}
@@ -573,7 +559,7 @@ export default function Dashboard() {
       {/* Row 4: Charts and AI Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fadeInUp" style={{ animationDelay: "600ms" }}>
         {/* Sales Trend Chart */}
-        <div className="lg:col-span-2 bg-blue-50/70 hover:bg-blue-200/70 border border-blue-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-1">
+        <div className="lg:col-span-2 bg-blue-50/70 hover:bg-blue-100/70 border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
               <FiBarChart2 className="text-indigo-500" /> Sales Trend (Last 30 Days)
@@ -602,7 +588,7 @@ export default function Dashboard() {
         </div>
 
         {/* Expense Breakdown Pie Chart */}
-        <div className="bg-rose-50/70 hover:bg-rose-200/70 border border-rose-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:border-rose-500 transition-all duration-300 transform hover:-translate-y-1">
+        <div className="bg-rose-50/70 hover:bg-rose-100/70 border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] transition-all duration-300 transform hover:-translate-y-1">
           <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
             <FiPieChart className="text-rose-500" /> Expense Breakdown
           </h3>
@@ -631,7 +617,7 @@ export default function Dashboard() {
       </div>
 
       {/* Row 5: AI Smart Insights */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-200 hover:to-purple-200 border border-indigo-300 rounded-lg p-4 shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:border-indigo-500 transform hover:-translate-y-1 animate-fadeInUp" style={{ animationDelay: "800ms" }}>
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] transition-all duration-300 transform hover:-translate-y-1 animate-fadeInUp" style={{ animationDelay: "800ms" }}>
         <div className="flex items-start gap-3">
           <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
             <FiZap size={20} />
@@ -653,14 +639,14 @@ export default function Dashboard() {
 
       {/* Row 6: Placeholder Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fadeInUp" style={{ animationDelay: "1000ms" }}>
-        <div className="bg-gray-50/70 hover:bg-gray-200/70 border border-gray-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] hover:border-gray-500 transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
+        <div className="bg-gray-50/70 hover:bg-gray-100/70 border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <FiTrendingUp size={32} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm font-medium">Advanced Analytics Coming Soon</p>
             <p className="text-xs">Profit vs Expenses comparison</p>
           </div>
         </div>
-        <div className="bg-gray-50/70 hover:bg-gray-200/70 border border-gray-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] hover:border-gray-500 transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
+        <div className="bg-gray-50/70 hover:bg-gray-100/70 border border-gray-300 hover:border-gray-500 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <FiActivity size={32} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm font-medium">Customer Retention Insights</p>
