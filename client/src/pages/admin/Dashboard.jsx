@@ -99,6 +99,119 @@ const groupExpensesByCategory = (expenses) => {
 // Colors for pie chart
 const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#A569BD", "#F39C12"];
 
+// Colour mapping for card backgrounds, borders, hover backgrounds, and glow effects
+// Now using border-{color}-300 for better visibility and border-{color}-500 on hover
+const colorClasses = {
+  indigo: {
+    bg: "bg-indigo-50",
+    hoverBg: "hover:bg-indigo-200",
+    border: "border-indigo-300",
+    hoverBorder: "hover:border-indigo-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(99,102,241,0.4)]",
+    iconBg: "bg-indigo-100",
+    iconText: "text-indigo-600",
+  },
+  amber: {
+    bg: "bg-amber-50",
+    hoverBg: "hover:bg-amber-200",
+    border: "border-amber-300",
+    hoverBorder: "hover:border-amber-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(245,158,11,0.4)]",
+    iconBg: "bg-amber-100",
+    iconText: "text-amber-600",
+  },
+  cyan: {
+    bg: "bg-cyan-50",
+    hoverBg: "hover:bg-cyan-200",
+    border: "border-cyan-300",
+    hoverBorder: "hover:border-cyan-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]",
+    iconBg: "bg-cyan-100",
+    iconText: "text-cyan-600",
+  },
+  emerald: {
+    bg: "bg-emerald-50",
+    hoverBg: "hover:bg-emerald-200",
+    border: "border-emerald-300",
+    hoverBorder: "hover:border-emerald-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(16,185,129,0.4)]",
+    iconBg: "bg-emerald-100",
+    iconText: "text-emerald-600",
+  },
+  blue: {
+    bg: "bg-blue-50",
+    hoverBg: "hover:bg-blue-200",
+    border: "border-blue-300",
+    hoverBorder: "hover:border-blue-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(59,130,246,0.4)]",
+    iconBg: "bg-blue-100",
+    iconText: "text-blue-600",
+  },
+  green: {
+    bg: "bg-green-50",
+    hoverBg: "hover:bg-green-200",
+    border: "border-green-300",
+    hoverBorder: "hover:border-green-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(34,197,94,0.4)]",
+    iconBg: "bg-green-100",
+    iconText: "text-green-600",
+  },
+  rose: {
+    bg: "bg-rose-50",
+    hoverBg: "hover:bg-rose-200",
+    border: "border-rose-300",
+    hoverBorder: "hover:border-rose-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(244,63,94,0.4)]",
+    iconBg: "bg-rose-100",
+    iconText: "text-rose-600",
+  },
+  purple: {
+    bg: "bg-purple-50",
+    hoverBg: "hover:bg-purple-200",
+    border: "border-purple-300",
+    hoverBorder: "hover:border-purple-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(168,85,247,0.4)]",
+    iconBg: "bg-purple-100",
+    iconText: "text-purple-600",
+  },
+  red: {
+    bg: "bg-red-50",
+    hoverBg: "hover:bg-red-200",
+    border: "border-red-300",
+    hoverBorder: "hover:border-red-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(239,68,68,0.4)]",
+    iconBg: "bg-red-100",
+    iconText: "text-red-600",
+  },
+  sky: {
+    bg: "bg-sky-50",
+    hoverBg: "hover:bg-sky-200",
+    border: "border-sky-300",
+    hoverBorder: "hover:border-sky-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]",
+    iconBg: "bg-sky-100",
+    iconText: "text-sky-600",
+  },
+  violet: {
+    bg: "bg-violet-50",
+    hoverBg: "hover:bg-violet-200",
+    border: "border-violet-300",
+    hoverBorder: "hover:border-violet-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(139,92,246,0.4)]",
+    iconBg: "bg-violet-100",
+    iconText: "text-violet-600",
+  },
+  orange: {
+    bg: "bg-orange-50",
+    hoverBg: "hover:bg-orange-200",
+    border: "border-orange-300",
+    hoverBorder: "hover:border-orange-500",
+    shadow: "hover:shadow-[0_0_20px_rgba(249,115,22,0.4)]",
+    iconBg: "bg-orange-100",
+    iconText: "text-orange-600",
+  },
+};
+
 export default function Dashboard() {
   const [stats, setStats] = useState({
     productsCount: 0,
@@ -287,7 +400,7 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Row 1: Core Business Metrics (with reduced padding) */}
+      {/* Row 1: Core Business Metrics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 animate-fadeInUp">
         {[
           {
@@ -301,7 +414,7 @@ export default function Dashboard() {
             label: "Low Stock Alerts",
             value: stats.lowStockCount,
             icon: FiAlertTriangle,
-            color: stats.lowStockCount > 0 ? "amber" : "emerald",
+            color: "amber",
             link: "/dashboard/stock",
           },
           {
@@ -318,30 +431,32 @@ export default function Dashboard() {
             color: "emerald",
             link: "/dashboard/employees",
           },
-        ].map((card, idx) => (
-          <div
-            key={idx}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 hover:border-${card.color}-300"
-            style={{ animationDelay: `${idx * 100}ms` }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
-                <h3 className="text-2xl font-black text-gray-900">{card.value}</h3>
-              </div>
-              <div className={`p-2 bg-${card.color}-50 rounded text-${card.color}-600`}>
-                <card.icon size={20} />
-              </div>
-            </div>
-            <Link
-              to={card.link}
-              className="text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors"
-              style={{ color: `var(--tw-color-${card.color}-600)` }}
+        ].map((card, idx) => {
+          const classes = colorClasses[card.color];
+          return (
+            <div
+              key={idx}
+              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              style={{ animationDelay: `${idx * 100}ms` }}
             >
-              View <FiArrowRight size={12} />
-            </Link>
-          </div>
-        ))}
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
+                  <h3 className="text-2xl font-black text-gray-900">{card.value}</h3>
+                </div>
+                <div className={`p-2 ${classes.iconBg} rounded ${classes.iconText}`}>
+                  <card.icon size={20} />
+                </div>
+              </div>
+              <Link
+                to={card.link}
+                className={`text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors ${classes.iconText}`}
+              >
+                View <FiArrowRight size={12} />
+              </Link>
+            </div>
+          );
+        })}
       </div>
 
       {/* Row 2: Financial Stats */}
@@ -371,25 +486,28 @@ export default function Dashboard() {
             icon: FiPieChart,
             color: stats.netProfit >= 0 ? "purple" : "red",
           },
-        ].map((card, idx) => (
-          <div
-            key={idx}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1"
-            style={{ animationDelay: `${(idx + 2) * 100}ms` }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
-                <h3 className={`text-2xl font-black ${card.color === "red" ? "text-red-600" : "text-gray-900"}`}>
-                  ৳{card.value}
-                </h3>
-              </div>
-              <div className={`p-2 bg-${card.color}-50 rounded text-${card.color}-600`}>
-                <card.icon size={20} />
+        ].map((card, idx) => {
+          const classes = colorClasses[card.color];
+          return (
+            <div
+              key={idx}
+              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              style={{ animationDelay: `${(idx + 2) * 100}ms` }}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
+                  <h3 className={`text-2xl font-black ${card.color === "red" ? "text-red-600" : "text-gray-900"}`}>
+                    ৳{card.value}
+                  </h3>
+                </div>
+                <div className={`p-2 ${classes.iconBg} rounded ${classes.iconText}`}>
+                  <card.icon size={20} />
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Row 3: Operational & Inventory */}
@@ -420,39 +538,42 @@ export default function Dashboard() {
             color: "orange",
             link: "/dashboard/suppliers",
           },
-        ].map((card, idx) => (
-          <div
-            key={idx}
-            className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1"
-            style={{ animationDelay: `${(idx + 4) * 100}ms` }}
-          >
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
-                <h3 className="text-2xl font-black text-gray-900">
-                  {typeof card.value === "string" ? "৳" + card.value : card.value}
-                </h3>
+        ].map((card, idx) => {
+          const classes = colorClasses[card.color];
+          return (
+            <div
+              key={idx}
+              className={`${classes.bg} ${classes.hoverBg} ${classes.border} rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-300 transform hover:-translate-y-1 ${classes.hoverBorder} ${classes.shadow}`}
+              style={{ animationDelay: `${(idx + 4) * 100}ms` }}
+            >
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">{card.label}</p>
+                  <h3 className="text-2xl font-black text-gray-900">
+                    {typeof card.value === "string" ? "৳" + card.value : card.value}
+                  </h3>
+                </div>
+                <div className={`p-2 ${classes.iconBg} rounded ${classes.iconText}`}>
+                  <card.icon size={20} />
+                </div>
               </div>
-              <div className={`p-2 bg-${card.color}-50 rounded text-${card.color}-600`}>
-                <card.icon size={20} />
-              </div>
+              {card.link && (
+                <Link
+                  to={card.link}
+                  className={`text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors ${classes.iconText}`}
+                >
+                  View <FiArrowRight size={12} />
+                </Link>
+              )}
             </div>
-            {card.link && (
-              <Link
-                to={card.link}
-                className="text-xs font-semibold mt-3 inline-flex items-center gap-1 hover:underline transition-colors text-orange-600"
-              >
-                View <FiArrowRight size={12} />
-              </Link>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Row 4: Charts and AI Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 animate-fadeInUp" style={{ animationDelay: "600ms" }}>
         {/* Sales Trend Chart */}
-        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition">
+        <div className="lg:col-span-2 bg-blue-50/70 hover:bg-blue-200/70 border border-blue-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] hover:border-blue-500 transition-all duration-300 transform hover:-translate-y-1">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
               <FiBarChart2 className="text-indigo-500" /> Sales Trend (Last 30 Days)
@@ -481,7 +602,7 @@ export default function Dashboard() {
         </div>
 
         {/* Expense Breakdown Pie Chart */}
-        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm hover:shadow-md transition">
+        <div className="bg-rose-50/70 hover:bg-rose-200/70 border border-rose-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:border-rose-500 transition-all duration-300 transform hover:-translate-y-1">
           <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2 mb-2">
             <FiPieChart className="text-rose-500" /> Expense Breakdown
           </h3>
@@ -510,7 +631,7 @@ export default function Dashboard() {
       </div>
 
       {/* Row 5: AI Smart Insights */}
-      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200 rounded-lg p-4 shadow-sm animate-fadeInUp" style={{ animationDelay: "800ms" }}>
+      <div className="bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-200 hover:to-purple-200 border border-indigo-300 rounded-lg p-4 shadow-sm transition-all duration-300 hover:shadow-[0_0_20px_rgba(99,102,241,0.3)] hover:border-indigo-500 transform hover:-translate-y-1 animate-fadeInUp" style={{ animationDelay: "800ms" }}>
         <div className="flex items-start gap-3">
           <div className="p-2 bg-indigo-100 rounded-full text-indigo-600">
             <FiZap size={20} />
@@ -530,16 +651,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Placeholder for additional charts (if needed) */}
+      {/* Row 6: Placeholder Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-fadeInUp" style={{ animationDelay: "1000ms" }}>
-        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm h-48 flex items-center justify-center text-gray-400">
+        <div className="bg-gray-50/70 hover:bg-gray-200/70 border border-gray-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] hover:border-gray-500 transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <FiTrendingUp size={32} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm font-medium">Advanced Analytics Coming Soon</p>
             <p className="text-xs">Profit vs Expenses comparison</p>
           </div>
         </div>
-        <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm h-48 flex items-center justify-center text-gray-400">
+        <div className="bg-gray-50/70 hover:bg-gray-200/70 border border-gray-300 rounded-lg p-4 shadow-sm hover:shadow-[0_0_20px_rgba(107,114,128,0.3)] hover:border-gray-500 transition-all duration-300 transform hover:-translate-y-1 h-48 flex items-center justify-center text-gray-400">
           <div className="text-center">
             <FiActivity size={32} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm font-medium">Customer Retention Insights</p>
