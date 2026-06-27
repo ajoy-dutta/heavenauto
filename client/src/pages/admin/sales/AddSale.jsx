@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import {
@@ -11,6 +11,7 @@ import {
   FiUserPlus,
   FiSave,
   FiArrowLeft,
+  FiSearch,
 } from "react-icons/fi";
 
 export default function AddSale() {
@@ -40,7 +41,7 @@ export default function AddSale() {
 
   // --- ITEM STATES ---
   const [manualItems, setManualItems] = useState([
-    { product: "", unit_price_bdt: "", quantity: "" },
+    { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false },
   ]);
   const [brandItems, setBrandItems] = useState([]);
 
@@ -55,6 +56,9 @@ export default function AddSale() {
     district: "",
     town_village: "",
   });
+
+  // Refs for dropdown outside click handling
+  const dropdownRefs = useRef({});
 
   // --- FETCH DATA ---
   useEffect(() => {
@@ -102,46 +106,88 @@ export default function AddSale() {
     setOrderData({ ...orderData, [e.target.name]: e.target.value });
   };
 
-  // --- MANUAL MODE (with auto-add and filtering) ---
+  // --- MANUAL MODE ---
   const handleManualItemChange = (index, field, value) => {
     const newItems = [...manualItems];
-    newItems[index][field] = value;
-
-    if (field === "product" && value) {
-      const selectedProduct = products.find((p) => String(p.id) === String(value));
-      if (selectedProduct) {
-        newItems[index].unit_price_bdt = selectedProduct.retail_price_bdt || 0;
-      }
-      // After setting product, add a new empty row at the end (if this is the last row)
-      if (index === newItems.length - 1) {
-        newItems.push({ product: "", unit_price_bdt: "", quantity: "" });
-      }
+    if (field === "search") {
+      newItems[index].search = value;
+      newItems[index].showDropdown = true;
+      setManualItems(newItems);
+      return;
     }
 
+    if (field === "product") {
+      // Prevent selecting the same product twice
+      const isDuplicate = manualItems.some(
+        (item, i) => i !== index && String(item.product) === String(value)
+      );
+
+      if (isDuplicate) {
+        alert("This product is already added to the list!");
+        return;
+      }
+
+      const selectedProduct = products.find((p) => String(p.id) === String(value));
+      if (selectedProduct) {
+        newItems[index].product = value;
+        newItems[index].unit_price_bdt = selectedProduct.retail_price_bdt || 0;
+        newItems[index].search = selectedProduct.product_name || selectedProduct.name || "";
+        newItems[index].showDropdown = false;
+      }
+      // Auto‑add a new empty row if this is the last row
+      if (index === newItems.length - 1) {
+        newItems.push({ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false });
+      }
+    } else {
+      newItems[index][field] = value;
+    }
     setManualItems(newItems);
   };
 
   const removeManualRow = (index) => {
-    // Prevent removing the only remaining row that might have a product
-    const filledRows = manualItems.filter((item) => item.product);
-    if (filledRows.length === 1 && manualItems[index].product) {
-      // If it's the last filled row, we can allow removal but will clear it and keep one empty row
-      setManualItems([{ product: "", unit_price_bdt: "", quantity: "" }]);
-      return;
-    }
     if (manualItems.length > 1) {
       setManualItems(manualItems.filter((_, i) => i !== index));
+    } else {
+      setManualItems([{ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false }]);
     }
   };
 
-  const getAvailableProducts = (currentIndex) => {
-    // Get all product IDs already selected in other rows
-    const selectedIds = manualItems
-      .filter((_, i) => i !== currentIndex)
-      .map((item) => item.product)
-      .filter((id) => id);
-    return products.filter((p) => !selectedIds.includes(String(p.id)));
+  // Filter products by search text and exclude already selected items
+  const getFilteredProducts = (searchText) => {
+    const lowerSearch = searchText.toLowerCase();
+    
+    // Get all product IDs that are already selected in manual rows
+    const selectedProductIds = manualItems
+      .map((item) => String(item.product))
+      .filter((id) => id !== "");
+
+    return products.filter((p) => {
+      if (selectedProductIds.includes(String(p.id))) return false; // Exclude already selected
+      
+      const name = (p.product_name || p.name || "").toLowerCase();
+      const brand = getBrandName(p.brand).toLowerCase();
+      return name.includes(lowerSearch) || brand.includes(lowerSearch);
+    });
   };
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      let outside = true;
+      Object.keys(dropdownRefs.current).forEach((key) => {
+        if (dropdownRefs.current[key] && dropdownRefs.current[key].contains(event.target)) {
+          outside = false;
+        }
+      });
+      if (outside) {
+        setManualItems((prev) =>
+          prev.map((item) => ({ ...item, showDropdown: false }))
+        );
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   // --- BRAND MODE ---
   const handleBrandDropdownSelect = (e) => {
@@ -157,7 +203,6 @@ export default function AddSale() {
   const toggleBrandSelection = (brandId) => {
     setSelectedBrands((prev) => {
       if (prev.includes(brandId)) {
-        // Remove brand
         const newBrands = prev.filter((id) => id !== brandId);
         setBrandItems((currentItems) => {
           const removedProductIds = products
@@ -169,7 +214,6 @@ export default function AddSale() {
         });
         return newBrands;
       } else {
-        // Add brand
         const newBrands = [...prev, brandId];
         const productsToAdd = products.filter((p) => String(p.brand) === String(brandId));
 
@@ -487,7 +531,7 @@ export default function AddSale() {
         )}
 
         {/* --- ITEMS TABLE --- */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto overflow-y-visible pb-24">
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-800 text-white">
@@ -589,33 +633,88 @@ export default function AddSale() {
                   const purchaseCost = selectedProd
                     ? parseFloat(selectedProd.purchase_cost_bdt).toFixed(2)
                     : "-";
-                  const availableProducts = getAvailableProducts(index);
+
+                  const filteredProducts = getFilteredProducts(item.search || "");
 
                   return (
                     <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      <td className="border border-gray-300 px-2 py-1.5">
-                        <select
-                          required
-                          value={item.product}
-                          onChange={(e) =>
-                            handleManualItemChange(index, "product", e.target.value)
-                          }
-                          className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs focus:ring-1 focus:ring-green-500 outline-none"
-                        >
-                          <option value="">Select Product</option>
-                          {availableProducts.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.product_name || p.name} ({getBrandName(p.brand)})
-                            </option>
-                          ))}
-                        </select>
+                      {/* FIX IMPLEMENTED HERE: Added conditional z-index so open dropdowns jump to the front layer over the below rows */}
+                      <td className={`border border-gray-300 px-2 py-3 overflow-visible ${item.showDropdown ? 'relative z-50' : 'relative z-10'}`}>
+                        <div ref={(el) => (dropdownRefs.current[index] = el)}>
+                          <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-green-500">
+                            <FiSearch className="ml-1.5 text-gray-400" size={12} />
+                            <input
+                              type="text"
+                              placeholder="Search product..."
+                              value={item.search || ""}
+                              onChange={(e) =>
+                                handleManualItemChange(index, "search", e.target.value)
+                              }
+                              onFocus={() => {
+                                const newItems = [...manualItems];
+                                newItems[index].showDropdown = true;
+                                setManualItems(newItems);
+                              }}
+                              className="w-full bg-transparent p-1 text-xs text-gray-800 focus:outline-none"
+                              autoComplete="off"
+                            />
+                            {item.product && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const newItems = [...manualItems];
+                                  newItems[index].product = "";
+                                  newItems[index].search = "";
+                                  newItems[index].unit_price_bdt = "";
+                                  newItems[index].showDropdown = false;
+                                  setManualItems(newItems);
+                                }}
+                                className="mr-1 text-gray-400 hover:text-red-500"
+                              >
+                                <FiX size={12} />
+                              </button>
+                            )}
+                          </div>
+                          {item.showDropdown && (
+                            <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto z-50">
+                              {filteredProducts.length > 0 ? (
+                                <ul>
+                                  {filteredProducts.map((p) => (
+                                    <li
+                                      key={p.id}
+                                      className="px-2 py-1 hover:bg-green-100 cursor-pointer text-xs flex justify-between items-center"
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        handleManualItemChange(index, "product", p.id);
+                                      }}
+                                    >
+                                      <span>
+                                        {p.product_name || p.name}{" "}
+                                        <span className="text-[10px] text-gray-500">
+                                          ({getBrandName(p.brand)})
+                                        </span>
+                                      </span>
+                                      <span className="text-[10px] text-gray-400">
+                                        Stock: {getProductStock(p.id)}
+                                      </span>
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="p-2 text-xs text-gray-400">
+                                  No additional products found
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
                         {manualBrandName && (
                           <div className="text-[9px] text-gray-500 uppercase mt-0.5">
                             {manualBrandName}
                           </div>
                         )}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5 text-center">
+                      <td className="border border-gray-300 px-2 py-3 text-center">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
                             currentStock !== "-" && currentStock <= 5
@@ -626,10 +725,10 @@ export default function AddSale() {
                           {currentStock}
                         </span>
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5 text-center font-mono text-gray-500 text-xs">
+                      <td className="border border-gray-300 px-2 py-3 text-center font-mono text-gray-500 text-xs">
                         {purchaseCost}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5">
+                      <td className="border border-gray-300 px-2 py-3">
                         <input
                           type="number"
                           step="0.01"
@@ -640,10 +739,10 @@ export default function AddSale() {
                           onChange={(e) =>
                             handleManualItemChange(index, "unit_price_bdt", e.target.value)
                           }
-                          className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none font-semibold text-green-700"
+                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none font-semibold text-green-700"
                         />
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5">
+                      <td className="border border-gray-300 px-2 py-3">
                         <input
                           type="number"
                           required
@@ -653,16 +752,16 @@ export default function AddSale() {
                           onChange={(e) =>
                             handleManualItemChange(index, "quantity", e.target.value)
                           }
-                          className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none"
+                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none"
                         />
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5 text-right font-mono font-bold text-gray-700 text-xs">
+                      <td className="border border-gray-300 px-2 py-3 text-right font-mono font-bold text-gray-700 text-xs">
                         {(
                           (parseFloat(item.quantity) || 0) *
                           (parseFloat(item.unit_price_bdt) || 0)
                         ).toFixed(2)}
                       </td>
-                      <td className="border border-gray-300 px-2 py-1.5 text-center">
+                      <td className="border border-gray-300 px-2 py-3 text-center">
                         <button
                           type="button"
                           onClick={() => removeManualRow(index)}
@@ -687,17 +786,17 @@ export default function AddSale() {
           </table>
         </div>
 
-        {/* --- ADD ROW BUTTON (Manual only, hidden because we auto-add) --- */}
+        {/* --- ADD ROW BUTTON (Manual only) --- */}
         {entryMode === "manual" && (
           <div className="p-2 border-t border-gray-200">
             <button
               type="button"
               onClick={() =>
-                setManualItems([...manualItems, { product: "", unit_price_bdt: "", quantity: "" }])
+                setManualItems([...manualItems, { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false }])
               }
               className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-semibold"
             >
-              <FiPlus size={14} /> Add Row (Manual)
+              <FiPlus size={14} /> Add Row
             </button>
           </div>
         )}
@@ -723,7 +822,7 @@ export default function AddSale() {
         </div>
       </form>
 
-      {/* --- CUSTOMER MODAL (Stylized) --- */}
+      {/* --- CUSTOMER MODAL (unchanged) --- */}
       {isCustomerModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-3">
           <div className="bg-white border border-gray-300 w-full max-w-md rounded-lg overflow-hidden max-h-[90vh] flex flex-col">

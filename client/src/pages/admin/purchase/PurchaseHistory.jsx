@@ -1,15 +1,26 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
-import { FiPlus, FiBox, FiSearch, FiX, FiSave, FiTrash2, FiEye } from "react-icons/fi";
+import {
+  FiPlus,
+  FiBox,
+  FiSearch,
+  FiX,
+  FiSave,
+  FiTrash2,
+  FiEye,
+  FiDollarSign,
+  FiCalendar,
+  FiList,
+} from "react-icons/fi";
 
 export default function PurchaseHistory() {
   const [purchases, setPurchases] = useState([]);
+  const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [products, setProducts] = useState([]);
-  
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,7 +28,7 @@ export default function PurchaseHistory() {
   // Edit/View Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editFormData, setEditFormData] = useState(null);
-  const [selectedItems, setSelectedItems] = useState([]); // To display nested items
+  const [selectedItems, setSelectedItems] = useState([]);
   const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
@@ -26,36 +37,77 @@ export default function PurchaseHistory() {
 
   const fetchData = async () => {
     try {
-      // Fetch purchases, suppliers, employees, PLUS brands and products for accurate naming
-      const [purRes, supRes, empRes, brandRes, prodRes] = await Promise.all([
+      const [purRes, prodRes, supRes, empRes, brandRes] = await Promise.all([
         axiosInstance.get("purchase/purchases/"),
+        axiosInstance.get("products/"),
         axiosInstance.get("supplier/suppliers/"),
         axiosInstance.get("person/employees/"),
         axiosInstance.get("brand/brands/"),
-        axiosInstance.get("products/")
       ]);
+
       setPurchases(purRes.data.results || purRes.data);
+      setProducts(prodRes.data.results || prodRes.data);
       setSuppliers(supRes.data.results || supRes.data);
       setEmployees(empRes.data.results || empRes.data);
       setBrands(brandRes.data.results || brandRes.data);
-      setProducts(prodRes.data.results || prodRes.data);
       setLoading(false);
     } catch (err) {
+      console.error(err);
       setError("Failed to fetch purchase data.");
       setLoading(false);
     }
   };
 
-  // --- EDIT / VIEW FUNCTIONALITY ---
+  // --- HELPERS ---
+  const getSupplierName = (id) => {
+    if (!id) return "Unknown Supplier";
+    const sup = suppliers.find((s) => String(s.id) === String(id));
+    return sup ? sup.name || sup.company_name : "Unknown Supplier";
+  };
+
+  const getEmployeeName = (id) => {
+    if (!id) return "Unknown";
+    const emp = employees.find((e) => String(e.id) === String(id));
+    if (!emp) return "Unknown";
+    return emp.first_name
+      ? `${emp.first_name} ${emp.last_name || ""}`.trim()
+      : emp.full_name || emp.name || emp.employee_id;
+  };
+
+  const getBrandName = (item) => {
+    const product = products.find(
+      (p) => String(p.id) === String(item.product) || p.product_name === item.product_name
+    );
+    if (!product) return "Unknown Brand";
+    const brand = brands.find((b) => String(b.id) === String(product.brand));
+    return brand ? brand.name : "Unknown Brand";
+  };
+
+  // --- STATS ---
+  const stats = useMemo(() => {
+    const total = purchases.reduce((sum, p) => {
+      const amt = parseFloat(p.total_amount) || 0;
+      return sum + amt;
+    }, 0);
+    const count = purchases.length;
+    const latest =
+      purchases.length > 0
+        ? purchases.reduce((latest, p) =>
+            new Date(p.purchase_date) > new Date(latest.purchase_date) ? p : latest
+          ).purchase_date
+        : null;
+    return { total, count, latest };
+  }, [purchases]);
+
+  // --- EDIT / VIEW ---
   const openEditModal = (purchase) => {
     setEditFormData({
       id: purchase.id,
       supplier: purchase.supplier || "",
       entry_by: purchase.entry_by || "",
-      payment_status: purchase.payment_status || "Unpaid", // Added Payment Status
-      invoice_number: purchase.invoice_number || "",
+      payment_status: purchase.payment_status || "Unpaid",
       remarks: purchase.remarks || "",
-      po_number: purchase.po_number
+      invoice_number: purchase.invoice_number,
     });
     setSelectedItems(purchase.items || []);
     setIsEditModalOpen(true);
@@ -70,20 +122,27 @@ export default function PurchaseHistory() {
     setEditLoading(true);
 
     try {
-      // We use PATCH to only update the header info (invoice, remarks, supplier, status)
-      await axiosInstance.patch(`purchase/purchases/${editFormData.id}/`, editFormData);
-      fetchData(); // Refresh the list
+      await axiosInstance.patch(`purchase/purchases/${editFormData.id}/`, {
+        payment_status: editFormData.payment_status,
+        remarks: editFormData.remarks,
+        // Optionally, you can also allow updating supplier/invoice if needed, but we keep them read-only
+      });
+      fetchData();
       setIsEditModalOpen(false);
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.detail || "Failed to update purchase order.");
+      alert(err.response?.data?.detail || "Failed to update purchase record.");
     } finally {
       setEditLoading(false);
     }
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm("Are you sure you want to permanently delete this PO? This will deduct the products from your stock!")) {
+    if (
+      window.confirm(
+        "Are you sure you want to permanently delete this Purchase Order? This will deduct the products from your stock!"
+      )
+    ) {
       try {
         await axiosInstance.delete(`purchase/purchases/${id}/`);
         fetchData();
@@ -93,25 +152,10 @@ export default function PurchaseHistory() {
     }
   };
 
-  // --- HELPERS ---
-  const getSupplierName = (id) => {
-    const sup = suppliers.find(s => String(s.id) === String(id));
-    return sup ? (sup.name || sup.company_name) : "Unknown Supplier";
-  };
-
-  const getBrandName = (item) => {
-    // Cross-reference the product to find the brand ID, then get the brand name
-    const product = products.find(p => String(p.id) === String(item.product) || p.product_name === item.product_name);
-    if (!product) return "Unknown Brand";
-    
-    const brand = brands.find(b => String(b.id) === String(product.brand));
-    return brand ? brand.name : "Unknown Brand";
-  };
-
-  // Filter purchases
+  // --- FILTER ---
   const filteredPurchases = purchases.filter((p) => {
     const supName = getSupplierName(p.supplier).toLowerCase();
-    const productNames = p.items ? p.items.map(i => i.product_name).join(" ").toLowerCase() : "";
+    const productNames = p.items ? p.items.map((i) => i.product_name).join(" ").toLowerCase() : "";
     const search = searchTerm.toLowerCase();
 
     return (
@@ -123,32 +167,71 @@ export default function PurchaseHistory() {
   });
 
   return (
-    <div className="p-4 md:p-6 text-gray-800 bg-gray-50 min-h-screen">
-      
-      {/* HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-bold flex items-center gap-2 text-gray-900">
-            <FiBox className="text-blue-600" /> Purchase History
+    <div className="max-w-7xl mx-auto p-3 bg-gray-50 min-h-screen">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <FiBox className="text-blue-600" /> Purchase Ledger
           </h1>
-          <p className="text-sm text-gray-500">Track incoming shipments and PO records.</p>
         </div>
         <Link
           to="/dashboard/purchase/add"
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded font-semibold transition flex items-center gap-2 text-sm shadow-sm"
+          className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-1.5 border border-blue-700"
         >
           <FiPlus /> New Purchase
         </Link>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-        
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 border border-gray-300 mb-4 bg-white">
+        <div className="p-2 border-r border-gray-300 flex items-center gap-2">
+          <FiDollarSign className="text-blue-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Total Purchases
+            </p>
+            <p className="text-lg font-bold text-gray-800">
+              ৳ {stats.total.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+        <div className="p-2 border-r border-gray-300 flex items-center gap-2">
+          <FiList className="text-indigo-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Purchase Orders
+            </p>
+            <p className="text-lg font-bold text-gray-800">{stats.count}</p>
+          </div>
+        </div>
+        <div className="p-2 flex items-center gap-2">
+          <FiCalendar className="text-purple-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Latest PO
+            </p>
+            <p className="text-sm font-semibold text-gray-700">
+              {stats.latest
+                ? new Date(stats.latest).toLocaleDateString("en-BD", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <div className="bg-white border border-gray-300 overflow-hidden">
         {/* Search Bar */}
-        <div className="p-3 border-b border-gray-200 flex items-center gap-2 bg-gray-50/50">
-          <FiSearch className="text-gray-400" />
+        <div className="border-b border-gray-300 px-3 py-1.5 flex items-center gap-2 bg-gray-50">
+          <FiSearch className="text-gray-400" size={14} />
           <input
             type="text"
-            placeholder="Search by PO Number, Product, Invoice, or Supplier..."
+            placeholder="Search by PO, Invoice, Product, or Supplier..."
             className="w-full bg-transparent text-sm text-gray-800 focus:outline-none placeholder-gray-400"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -156,83 +239,118 @@ export default function PurchaseHistory() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-500 text-sm font-medium animate-pulse">Loading records...</div>
+          <div className="p-8 text-center text-gray-400 text-sm">Loading records...</div>
         ) : error ? (
-          <div className="p-8 text-center text-red-500 text-sm font-medium">{error}</div>
+          <div className="p-8 text-center text-red-500 text-sm">{error}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
-              <thead className="bg-gray-100 text-gray-600 border-b border-gray-200">
-                <tr>
-                  <th className="p-3 font-bold">PO & Date</th>
-                  <th className="p-3 font-bold">Supplier Info</th>
-                  <th className="p-3 font-bold">Items Summary</th>
-                  <th className="p-3 font-bold">Status</th> {/* ADDED STATUS HEADER */}
-                  <th className="p-3 font-bold text-right">Total Amount (৳)</th>
-                  <th className="p-3 font-bold text-center">Actions</th>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-800 text-white">
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    PO / Date
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Supplier / Entry By
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Items
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
+                    Status
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-right">
+                    Total
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
+                    Actions
+                  </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {filteredPurchases.length > 0 ? (
-                  filteredPurchases.map((purchase) => (
-                    <tr key={purchase.id} className="hover:bg-blue-50/50 transition">
-                      <td className="p-3">
-                        <div className="font-bold text-blue-600">{purchase.po_number}</div>
-                        <div className="text-xs text-gray-500">
-                          {new Date(purchase.purchase_date).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-semibold text-gray-800">{getSupplierName(purchase.supplier)}</div>
-                        <div className="text-xs text-gray-500">Inv: {purchase.invoice_number || "N/A"}</div>
-                      </td>
-                      <td className="p-3">
-                        <div className="font-medium text-gray-700">
-                          {purchase.items?.length || 0} Products
-                        </div>
-                        <div className="text-xs text-gray-500 truncate max-w-[200px]" title={purchase.items?.map(i => i.product_name).join(', ')}>
-                          {purchase.items?.map(i => i.product_name).join(', ')}
-                        </div>
-                      </td>
-                      
-                      {/* ADDED STATUS BADGE */}
-                      <td className="p-3">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                          purchase.payment_status === 'Paid' ? 'bg-green-100 text-green-700' :
-                          purchase.payment_status === 'Partial' ? 'bg-amber-100 text-amber-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
-                          {purchase.payment_status || "Unpaid"}
-                        </span>
-                      </td>
+                  filteredPurchases.map((purchase, index) => {
+                    const displayTotal =
+                      parseFloat(purchase.total_amount) > 0
+                        ? parseFloat(purchase.total_amount)
+                        : purchase.items?.reduce((sum, i) => sum + parseFloat(i.total_cost_bdt || 0), 0);
 
-                      <td className="p-3 text-right font-bold text-gray-900">
-                        {parseFloat(purchase.total_amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="p-3 text-center">
-                        <div className="flex justify-center items-center gap-3">
-                          <button 
-                            onClick={() => openEditModal(purchase)}
-                            className="text-blue-500 hover:text-blue-700 transition flex items-center gap-1 font-semibold text-xs bg-blue-50 px-2 py-1 rounded border border-blue-100"
-                            title="View / Edit Record"
+                    return (
+                      <tr
+                        key={purchase.id}
+                        className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                      >
+                        <td className="border border-gray-300 px-2 py-1.5 align-top">
+                          <div className="font-medium text-gray-800 text-xs">
+                            {purchase.po_number}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            {new Date(purchase.purchase_date).toLocaleDateString("en-BD", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5">
+                          <div className="text-xs font-medium text-gray-800">
+                            {getSupplierName(purchase.supplier)}
+                          </div>
+                          <div className="text-[10px] text-gray-500">
+                            By: {getEmployeeName(purchase.entry_by)}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5 max-w-[200px]">
+                          <div className="text-xs font-medium text-gray-700">
+                            {purchase.items?.length || 0} products
+                          </div>
+                          <div
+                            className="text-[10px] text-gray-500 truncate"
+                            title={purchase.items?.map((i) => i.product_name).join(", ")}
                           >
-                            <FiEye /> View
-                          </button>
-                          <button 
-                            onClick={() => handleDelete(purchase.id)}
-                            className="text-red-500 hover:text-red-700 transition"
-                            title="Delete Record"
+                            {purchase.items?.map((i) => i.product_name).join(", ")}
+                          </div>
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">
+                          <span
+                            className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              purchase.payment_status === "Paid"
+                                ? "bg-green-100 text-green-700 border border-green-200"
+                                : purchase.payment_status === "Partial"
+                                ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                : "bg-red-100 text-red-700 border border-red-200"
+                            }`}
                           >
-                            <FiTrash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                            {purchase.payment_status || "Unpaid"}
+                          </span>
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-right font-mono font-bold text-gray-800">
+                          ৳ {displayTotal.toFixed(2)}
+                        </td>
+                        <td className="border border-gray-300 px-2 py-1.5 text-center">
+                          <div className="flex justify-center items-center gap-1">
+                            <button
+                              onClick={() => openEditModal(purchase)}
+                              className="text-blue-600 hover:text-blue-800 transition p-0.5"
+                              title="View / Edit"
+                            >
+                              <FiEye size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(purchase.id)}
+                              className="text-gray-400 hover:text-red-600 transition p-0.5"
+                              title="Delete"
+                            >
+                              <FiTrash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
-                    {/* Updated colSpan from 5 to 6 to account for the new Status column */}
-                    <td colSpan="6" className="p-8 text-center text-gray-500 text-sm">
+                    <td colSpan="6" className="border border-gray-300 px-3 py-6 text-center text-gray-400 text-sm">
                       No purchase records found.
                     </td>
                   </tr>
@@ -243,52 +361,71 @@ export default function PurchaseHistory() {
         )}
       </div>
 
-      {/* --- DETAILS / EDIT MODAL --- */}
+      {/* --- EDIT / VIEW MODAL (Read‑only supplier & entry_by) --- */}
       {isEditModalOpen && editFormData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50 p-4 backdrop-blur-sm">
-          <div className="bg-white rounded-lg border border-gray-200 w-full max-w-4xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-            
-            {/* Modal Header */}
-            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 shrink-0">
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-3">
+          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden rounded-lg">
+            {/* Header */}
+            <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center shrink-0">
               <div>
-                <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                  <FiBox className="text-blue-600" /> {editFormData.po_number}
+                <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                  <FiBox className="text-blue-600" /> {editFormData.invoice_number || "PO Details"}
                 </h2>
-                <p className="text-xs text-gray-500 mt-0.5">View products and update order header.</p>
+                <p className="text-[10px] text-gray-500">View products & update logistics</p>
               </div>
-              <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-red-500 transition">
-                <FiX size={24} />
+              <button
+                onClick={() => setIsEditModalOpen(false)}
+                className="text-gray-500 hover:text-red-500"
+              >
+                <FiX size={20} />
               </button>
             </div>
 
-            {/* Modal Body (Scrollable) */}
-            <div className="p-4 overflow-y-auto space-y-6">
-              
-              {/* Product Details (Read Only) */}
+            {/* Body (scrollable) */}
+            <div className="overflow-y-auto flex-1 p-4 space-y-4">
+              {/* Products Table (Read‑only) */}
               <div>
-                <h3 className="text-sm font-bold text-gray-700 mb-2 border-b pb-1">Products Received</h3>
-                <div className="border border-gray-200 rounded overflow-hidden">
-                  <table className="w-full text-left text-sm whitespace-nowrap">
-                    <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
-                      <tr>
-                        <th className="p-2 font-semibold">Product & Brand</th>
-                        <th className="p-2 font-semibold text-right">Qty</th>
-                        <th className="p-2 font-semibold text-right">Unit Cost</th>
-                        <th className="p-2 font-semibold text-right">Total</th>
+                <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                  Products Received
+                </h3>
+                <div className="border border-gray-300 overflow-hidden">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-800 text-white">
+                        <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-left">
+                          Product & Brand
+                        </th>
+                        <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-center">
+                          Qty
+                        </th>
+                        <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
+                          Unit Cost
+                        </th>
+                        <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
+                          Total
+                        </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody>
                       {selectedItems.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2">
-                            <div className="text-gray-800 font-medium">{item.product_name}</div>
-                            <div className="text-[10px] text-gray-500 uppercase tracking-wide mt-0.5">
+                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                          <td className="border border-gray-300 px-2 py-1">
+                            <div className="text-xs font-medium text-gray-800">
+                              {item.product_name}
+                            </div>
+                            <div className="text-[9px] text-gray-500 uppercase">
                               {getBrandName(item)}
                             </div>
                           </td>
-                          <td className="p-2 text-right">{item.quantity}</td>
-                          <td className="p-2 text-right">৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}</td>
-                          <td className="p-2 text-right font-bold text-gray-700">৳ {parseFloat(item.total_cost_bdt).toFixed(2)}</td>
+                          <td className="border border-gray-300 px-2 py-1 text-center text-xs">
+                            {item.quantity}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1 text-right font-mono text-xs">
+                            ৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}
+                          </td>
+                          <td className="border border-gray-300 px-2 py-1 text-right font-mono font-bold text-xs">
+                            ৳ {parseFloat(item.total_cost_bdt).toFixed(2)}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -296,77 +433,66 @@ export default function PurchaseHistory() {
                 </div>
               </div>
 
-              {/* Editable Header Form */}
+              {/* Logistics Form – only payment_status and remarks are editable */}
               <form id="editForm" onSubmit={handleEditSubmit}>
-                <h3 className="text-sm font-bold text-gray-700 mb-3 border-b pb-1">Order Logistics</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                  Update Logistics
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 border border-gray-300 p-2 bg-gray-50">
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Supplier</label>
-                    <select
-                      name="supplier" required value={editFormData.supplier} onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="">Select Supplier</option>
-                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name || s.company_name}</option>)}
-                    </select>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                      Supplier
+                    </label>
+                    <p className="text-sm font-medium text-gray-800">
+                      {getSupplierName(editFormData.supplier)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Entry By</label>
-                    <select
-                      name="entry_by" value={editFormData.entry_by} onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map(e => {
-                        const displayName = e.first_name 
-                          ? `${e.first_name} ${e.last_name || ''}`.trim() 
-                          : e.full_name || e.name || e.employee_id;
-                        return (
-                          <option key={e.id} value={e.id}>
-                            {displayName} ({e.employee_id})
-                          </option>
-                        );
-                      })}
-                    </select>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                      Entry By (Employee)
+                    </label>
+                    <p className="text-sm font-medium text-gray-800">
+                      {getEmployeeName(editFormData.entry_by)}
+                    </p>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Invoice Number</label>
-                    <input
-                      type="text" name="invoice_number" value={editFormData.invoice_number} onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
-                  
-                  {/* ADDED PAYMENT STATUS DROPDOWN */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Payment Status</label>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                      Payment Status
+                    </label>
                     <select
-                      name="payment_status" value={editFormData.payment_status} onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                      name="payment_status"
+                      value={editFormData.payment_status}
+                      onChange={handleEditChange}
+                      className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
                     >
                       <option value="Paid">Paid</option>
                       <option value="Partial">Partial</option>
                       <option value="Unpaid">Unpaid</option>
                     </select>
                   </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs font-bold text-gray-600 mb-1">Remarks / Notes</label>
+                  <div>
+                    <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                      Remarks
+                    </label>
                     <input
-                      type="text" name="remarks" value={editFormData.remarks} onChange={handleEditChange}
-                      className="w-full border border-gray-300 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                      type="text"
+                      name="remarks"
+                      value={editFormData.remarks || ""}
+                      onChange={handleEditChange}
+                      className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
+                      placeholder="Add note"
                     />
                   </div>
                 </div>
               </form>
             </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
+            {/* Footer */}
+            <div className="bg-gray-50 border-t border-gray-300 px-4 py-2 flex justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setIsEditModalOpen(false)}
-                className="px-4 py-2 rounded text-sm font-bold text-gray-600 hover:bg-gray-200 transition"
+                className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 border border-gray-300"
               >
                 Close
               </button>
@@ -374,14 +500,13 @@ export default function PurchaseHistory() {
                 form="editForm"
                 type="submit"
                 disabled={editLoading}
-                className={`px-5 py-2 rounded text-sm font-bold text-white transition flex items-center gap-2 ${
+                className={`px-4 py-1.5 rounded text-sm font-bold text-white transition flex items-center gap-1.5 ${
                   editLoading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
                 <FiSave /> {editLoading ? "Saving..." : "Update Logistics"}
               </button>
             </div>
-
           </div>
         </div>
       )}

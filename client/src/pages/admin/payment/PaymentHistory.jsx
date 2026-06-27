@@ -1,6 +1,19 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import axiosInstance from "../../../api/axios";
-import { FiSearch, FiFilter, FiPrinter, FiEye, FiX, FiFileText, FiClock, FiCheckSquare } from "react-icons/fi";
+import {
+  FiSearch,
+  FiFilter,
+  FiPrinter,
+  FiEye,
+  FiX,
+  FiFileText,
+  FiClock,
+  FiCheckSquare,
+  FiDollarSign,
+  FiList,
+  FiCalendar,
+  FiLoader,
+} from "react-icons/fi";
 
 export default function PaymentHistory() {
   const [payments, setPayments] = useState([]);
@@ -17,6 +30,55 @@ export default function PaymentHistory() {
 
   // Modal Details
   const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null);
+  const [orderItems, setOrderItems] = useState([]);
+  const [orderLoading, setOrderLoading] = useState(false);
+
+  // Fetch products for a given order (sale or purchase)
+  const fetchOrderItems = async (payment) => {
+    setOrderLoading(true);
+    setOrderItems([]);
+
+    try {
+      let orderId = null;
+      let endpoint = "";
+
+      if (payment.payment_type === "IN" && payment.sale) {
+        orderId = payment.sale;
+        endpoint = `sale/sales/${orderId}/`;
+      } else if (payment.payment_type === "OUT" && payment.purchase) {
+        orderId = payment.purchase;
+        endpoint = `purchase/purchases/${orderId}/`;
+      } else {
+        // Fallback: maybe the payment has a reference string but not the ID – we can try to fetch by invoice/PO?
+        // For now, just leave empty.
+        setOrderLoading(false);
+        return;
+      }
+
+      const res = await axiosInstance.get(endpoint);
+      const orderData = res.data;
+      // Extract items – the field might be 'items' or 'order_items' depending on your API.
+      // Sale: items, Purchase: items. We'll use 'items'.
+      const items = orderData.items || [];
+      setOrderItems(items);
+    } catch (err) {
+      console.error("Failed to fetch order items", err);
+      setOrderItems([]);
+    } finally {
+      setOrderLoading(false);
+    }
+  };
+
+  // When modal opens, fetch items
+  const openModal = (payment) => {
+    setSelectedPaymentDetails(payment);
+    fetchOrderItems(payment);
+  };
+
+  const closeModal = () => {
+    setSelectedPaymentDetails(null);
+    setOrderItems([]);
+  };
 
   useEffect(() => {
     fetchPayments();
@@ -34,24 +96,43 @@ export default function PaymentHistory() {
     }
   };
 
-  // --- FILTERING LOGIC ---
+  // --- STATS ---
+  const stats = useMemo(() => {
+    const totalIn = payments
+      .filter((p) => p.payment_type === "IN")
+      .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+    const totalOut = payments
+      .filter((p) => p.payment_type === "OUT")
+      .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
+    const net = totalIn - totalOut;
+    const count = payments.length;
+    const latest =
+      payments.length > 0
+        ? payments.reduce((latest, p) =>
+            new Date(p.payment_date) > new Date(latest.payment_date) ? p : latest
+          ).payment_date
+        : null;
+    return { totalIn, totalOut, net, count, latest };
+  }, [payments]);
+
+  // --- FILTERING ---
   const filteredPayments = payments.filter((pay) => {
-    const matchesSearch = 
+    const matchesSearch =
       pay.payment_id?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pay.sale_invoice?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pay.purchase_po?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pay.transaction_id?.toLowerCase().includes(searchTerm.toLowerCase());
-      
+
     const matchesType = filterType === "ALL" || pay.payment_type === filterType;
     const matchesMethod = filterMethod === "ALL" || pay.payment_method === filterMethod;
 
     return matchesSearch && matchesType && matchesMethod;
   });
 
-  // --- SELECTION LOGIC ---
+  // --- SELECTION ---
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedIds(filteredPayments.map(p => p.id));
+      setSelectedIds(filteredPayments.map((p) => p.id));
     } else {
       setSelectedIds([]);
     }
@@ -59,26 +140,29 @@ export default function PaymentHistory() {
 
   const handleSelect = (id) => {
     if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(itemId => itemId !== id));
+      setSelectedIds(selectedIds.filter((itemId) => itemId !== id));
     } else {
       setSelectedIds([...selectedIds, id]);
     }
   };
 
-  // --- PRINT PDF LOGIC ---
+  // --- PRINT LEDGER ---
   const handlePrint = () => {
     if (selectedIds.length === 0) {
       alert("Please select at least one transaction to print.");
       return;
     }
 
-    const itemsToPrint = payments.filter(p => selectedIds.includes(p.id));
-    
-    // Calculate Totals for the print ledger
-    const totalIn = itemsToPrint.filter(p => p.payment_type === 'IN').reduce((sum, p) => sum + parseFloat(p.amount), 0);
-    const totalOut = itemsToPrint.filter(p => p.payment_type === 'OUT').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const itemsToPrint = payments.filter((p) => selectedIds.includes(p.id));
 
-    const printWindow = window.open('', '_blank');
+    const totalIn = itemsToPrint
+      .filter((p) => p.payment_type === "IN")
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    const totalOut = itemsToPrint
+      .filter((p) => p.payment_type === "OUT")
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+
+    const printWindow = window.open("", "_blank");
     const htmlContent = `
       <html>
         <head>
@@ -120,21 +204,29 @@ export default function PaymentHistory() {
               </tr>
             </thead>
             <tbody>
-              ${itemsToPrint.map(p => `
+              ${itemsToPrint
+                .map(
+                  (p) => `
                 <tr>
                   <td><strong>${p.payment_id}</strong></td>
                   <td>${new Date(p.payment_date).toLocaleDateString()}</td>
-                  <td>${p.payment_type === 'IN' ? 'Received (Sale)' : 'Paid (Purchase)'}</td>
-                  <td>${p.payment_type === 'IN' ? p.sale_invoice : p.purchase_po}</td>
+                  <td>${p.payment_type === "IN" ? "Received (Sale)" : "Paid (Purchase)"}</td>
+                  <td>${p.payment_type === "IN" ? p.sale_invoice : p.purchase_po}</td>
                   <td>
                     ${p.payment_method}
-                    ${p.transaction_id ? `<br><small style="color:#6b7280">Trx: ${p.transaction_id}</small>` : ''}
+                    ${
+                      p.transaction_id
+                        ? `<br><small style="color:#6b7280">Trx: ${p.transaction_id}</small>`
+                        : ""
+                    }
                   </td>
-                  <td class="text-right ${p.payment_type === 'IN' ? 'in' : 'out'}">
-                    ${p.payment_type === 'IN' ? '+' : '-'} ৳${parseFloat(p.amount).toFixed(2)}
+                  <td class="text-right ${p.payment_type === "IN" ? "in" : "out"}">
+                    ${p.payment_type === "IN" ? "+" : "-"} ৳${parseFloat(p.amount).toFixed(2)}
                   </td>
                 </tr>
-              `).join('')}
+              `
+                )
+                .join("")}
             </tbody>
           </table>
 
@@ -142,7 +234,7 @@ export default function PaymentHistory() {
             <div class="summary-box">
               <div class="summary-row"><span>Total Received:</span> <span class="in">+ ৳${totalIn.toFixed(2)}</span></div>
               <div class="summary-row"><span>Total Paid Out:</span> <span class="out">- ৳${totalOut.toFixed(2)}</span></div>
-              <div class="summary-row total"><span>Net Movement:</span> <span>${totalIn >= totalOut ? '+' : '-'} ৳${Math.abs(totalIn - totalOut).toFixed(2)}</span></div>
+              <div class="summary-row total"><span>Net Movement:</span> <span>${totalIn >= totalOut ? "+" : "-"} ৳${Math.abs(totalIn - totalOut).toFixed(2)}</span></div>
             </div>
           </div>
           
@@ -157,68 +249,105 @@ export default function PaymentHistory() {
   };
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen text-gray-800">
-      
+    <div className="max-w-7xl mx-auto p-3 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <div className="flex items-center space-x-3">
-          <div className="bg-indigo-100 p-3 rounded-full text-indigo-600">
-            <FiFileText className="text-2xl" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Payment History</h1>
-            <p className="text-sm text-gray-500">Filter, search, and export your master transaction ledger.</p>
-          </div>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            <FiFileText className="text-indigo-600" /> Payment Ledger
+          </h1>
         </div>
-        
-        <button 
+        <button
           onClick={handlePrint}
           disabled={selectedIds.length === 0}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-lg font-bold transition shadow-sm ${
-            selectedIds.length > 0 
-            ? "bg-indigo-600 hover:bg-indigo-700 text-white" 
-            : "bg-gray-200 text-gray-400 cursor-not-allowed"
+          className={`px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-1.5 border ${
+            selectedIds.length > 0
+              ? "bg-indigo-600 hover:bg-indigo-700 text-white border-indigo-700"
+              : "bg-gray-200 text-gray-400 cursor-not-allowed border-gray-300"
           }`}
         >
           <FiPrinter /> Print Selected ({selectedIds.length})
         </button>
       </div>
 
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        
+      {/* Stats Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 border border-gray-300 mb-4 bg-white">
+        <div className="p-2 border-r border-gray-300 flex items-center gap-2">
+          <FiDollarSign className="text-green-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Received
+            </p>
+            <p className="text-lg font-bold text-green-700">
+              ৳ {stats.totalIn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+        <div className="p-2 border-r border-gray-300 flex items-center gap-2">
+          <FiDollarSign className="text-red-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Paid Out
+            </p>
+            <p className="text-lg font-bold text-red-700">
+              ৳ {stats.totalOut.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+        <div className="p-2 border-r border-gray-300 flex items-center gap-2">
+          <FiDollarSign className="text-indigo-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Net Balance
+            </p>
+            <p className={`text-lg font-bold ${stats.net >= 0 ? "text-green-600" : "text-red-600"}`}>
+              ৳ {stats.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+        </div>
+        <div className="p-2 flex items-center gap-2">
+          <FiList className="text-indigo-600 text-lg" />
+          <div>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+              Transactions
+            </p>
+            <p className="text-lg font-bold text-gray-800">{stats.count}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <div className="bg-white border border-gray-300 overflow-hidden">
         {/* Filter Bar */}
-        <div className="p-4 border-b border-gray-200 bg-gray-50 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-          
-          <div className="md:col-span-4 relative">
-            <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-            <input 
-              type="text" 
-              placeholder="Search ID, Order Ref, or Trx ID..." 
+        <div className="border-b border-gray-300 px-3 py-1.5 bg-gray-50 grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+          <div className="sm:col-span-4 relative">
+            <FiSearch className="absolute left-2 top-1/2 transform -translate-y-1/2 text-gray-400" size={14} />
+            <input
+              type="text"
+              placeholder="Search ID, Reference, or Trx..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full pl-7 pr-2 py-1 bg-white border border-gray-300 rounded text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
             />
           </div>
-
-          <div className="md:col-span-4 flex items-center gap-2">
-            <FiFilter className="text-gray-400 shrink-0" />
-            <select 
-              value={filterType} 
+          <div className="sm:col-span-4 flex items-center gap-1">
+            <FiFilter className="text-gray-400 shrink-0" size={14} />
+            <select
+              value={filterType}
               onChange={(e) => setFilterType(e.target.value)}
-              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full bg-white border border-gray-300 rounded py-1 px-1 text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
             >
-              <option value="ALL">All Types (In & Out)</option>
-              <option value="IN">Money Received (Sales)</option>
-              <option value="OUT">Money Paid (Purchases)</option>
+              <option value="ALL">All Types</option>
+              <option value="IN">Received (Sales)</option>
+              <option value="OUT">Paid (Purchases)</option>
             </select>
           </div>
-
-          <div className="md:col-span-4 flex items-center gap-2">
-            <FiCheckSquare className="text-gray-400 shrink-0" />
-            <select 
-              value={filterMethod} 
+          <div className="sm:col-span-4 flex items-center gap-1">
+            <FiCheckSquare className="text-gray-400 shrink-0" size={14} />
+            <select
+              value={filterMethod}
               onChange={(e) => setFilterMethod(e.target.value)}
-              className="w-full p-2 bg-white border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
+              className="w-full bg-white border border-gray-300 rounded py-1 px-1 text-sm focus:ring-1 focus:ring-indigo-500 outline-none"
             >
               <option value="ALL">All Methods</option>
               <option value="Cash">Cash</option>
@@ -230,72 +359,109 @@ export default function PaymentHistory() {
           </div>
         </div>
 
-        {/* Table */}
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading ledger...</div>
+          <div className="p-8 text-center text-gray-400 text-sm">Loading ledger...</div>
         ) : error ? (
-          <div className="p-8 text-center text-red-500">{error}</div>
+          <div className="p-8 text-center text-red-500 text-sm">{error}</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="bg-gray-100 text-gray-600 text-xs uppercase tracking-wider border-b border-gray-200">
-                  <th className="p-4 w-10 text-center">
-                    <input 
-                      type="checkbox" 
-                      onChange={handleSelectAll} 
-                      checked={filteredPayments.length > 0 && selectedIds.length === filteredPayments.length}
+                <tr className="bg-gray-800 text-white">
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center w-8">
+                    <input
+                      type="checkbox"
+                      onChange={handleSelectAll}
+                      checked={
+                        filteredPayments.length > 0 &&
+                        selectedIds.length === filteredPayments.length
+                      }
                       className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                     />
                   </th>
-                  <th className="p-4">Txn ID / Date</th>
-                  <th className="p-4">Type</th>
-                  <th className="p-4">Reference</th>
-                  <th className="p-4">Method & Details</th>
-                  <th className="p-4 text-right">Amount</th>
-                  <th className="p-4 text-center">Action</th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Txn ID / Date
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Type
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Reference
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
+                    Method / Details
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-right">
+                    Amount
+                  </th>
+                  <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
+                    Action
+                  </th>
                 </tr>
               </thead>
-              <tbody className="text-sm divide-y divide-gray-100">
+              <tbody>
                 {filteredPayments.length === 0 ? (
-                  <tr><td colSpan="7" className="p-8 text-center text-gray-500">No transactions match your filters.</td></tr>
+                  <tr>
+                    <td colSpan="7" className="border border-gray-300 px-3 py-6 text-center text-gray-400 text-sm">
+                      No transactions match your filters.
+                    </td>
+                  </tr>
                 ) : (
-                  filteredPayments.map((pay) => (
-                    <tr key={pay.id} className={`hover:bg-indigo-50/30 transition ${selectedIds.includes(pay.id) ? 'bg-indigo-50' : ''}`}>
-                      <td className="p-4 text-center">
-                        <input 
-                          type="checkbox" 
+                  filteredPayments.map((pay, index) => (
+                    <tr
+                      key={pay.id}
+                      className={`${index % 2 === 0 ? "bg-white" : "bg-gray-50"} ${
+                        selectedIds.includes(pay.id) ? "bg-indigo-50" : ""
+                      }`}
+                    >
+                      <td className="border border-gray-300 px-2 py-1.5 text-center">
+                        <input
+                          type="checkbox"
                           checked={selectedIds.includes(pay.id)}
                           onChange={() => handleSelect(pay.id)}
                           className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                         />
                       </td>
-                      <td className="p-4">
-                        <div className="font-bold text-gray-900">{pay.payment_id}</div>
-                        <div className="text-xs text-gray-500 flex items-center mt-1"><FiClock className="mr-1" /> {new Date(pay.payment_date).toLocaleDateString()}</div>
+                      <td className="border border-gray-300 px-2 py-1.5">
+                        <div className="font-medium text-gray-800 text-xs">{pay.payment_id}</div>
+                        <div className="text-[10px] text-gray-500 flex items-center gap-1">
+                          <FiClock size={10} /> {new Date(pay.payment_date).toLocaleDateString()}
+                        </div>
                       </td>
-                      <td className="p-4">
-                        {pay.payment_type === "IN" 
-                          ? <span className="bg-green-100 text-green-700 px-2 py-1 rounded text-xs font-bold border border-green-200">Received</span> 
-                          : <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-bold border border-red-200">Paid Out</span>}
+                      <td className="border border-gray-300 px-2 py-1.5">
+                        {pay.payment_type === "IN" ? (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-green-100 text-green-700 border border-green-200">
+                            Received
+                          </span>
+                        ) : (
+                          <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-700 border border-red-200">
+                            Paid
+                          </span>
+                        )}
                       </td>
-                      <td className="p-4 font-mono text-gray-700 font-medium">
+                      <td className="border border-gray-300 px-2 py-1.5 font-mono text-xs text-gray-700">
                         {pay.payment_type === "IN" ? pay.sale_invoice : pay.purchase_po}
                       </td>
-                      <td className="p-4">
-                        <div className="font-semibold text-gray-800">{pay.payment_method}</div>
-                        {pay.transaction_id && <div className="text-xs text-gray-500">Trx: {pay.transaction_id}</div>}
+                      <td className="border border-gray-300 px-2 py-1.5">
+                        <div className="text-xs font-medium text-gray-800">{pay.payment_method}</div>
+                        {pay.transaction_id && (
+                          <div className="text-[10px] text-gray-500">Trx: {pay.transaction_id}</div>
+                        )}
                       </td>
-                      <td className={`p-4 text-right font-black ${pay.payment_type === "IN" ? "text-green-600" : "text-red-600"}`}>
+                      <td
+                        className={`border border-gray-300 px-2 py-1.5 text-right font-mono font-bold text-xs ${
+                          pay.payment_type === "IN" ? "text-green-600" : "text-red-600"
+                        }`}
+                      >
                         {pay.payment_type === "IN" ? "+" : "-"} ৳{parseFloat(pay.amount).toFixed(2)}
                       </td>
-                      <td className="p-4 text-center">
-                        <button 
-                          onClick={() => setSelectedPaymentDetails(pay)} 
-                          className="text-indigo-600 hover:text-indigo-800 bg-indigo-50 p-2 rounded transition border border-indigo-100" 
+                      <td className="border border-gray-300 px-2 py-1.5 text-center">
+                        <button
+                          onClick={() => openModal(pay)}
+                          className="text-indigo-600 hover:text-indigo-800 transition p-0.5"
                           title="View Full Details"
                         >
-                          <FiEye />
+                          <FiEye size={15} />
                         </button>
                       </td>
                     </tr>
@@ -307,76 +473,199 @@ export default function PaymentHistory() {
         )}
       </div>
 
-      {/* --- PAYMENT DETAILS MODAL --- */}
+      {/* --- DETAILS MODAL --- */}
       {selectedPaymentDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 backdrop-blur-sm flex justify-center items-center z-50 p-4">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden border border-gray-200">
-            {/* Modal Header */}
-            <div className="bg-gray-50 border-b border-gray-200 px-5 py-4 flex justify-between items-center">
-              <h3 className="font-bold text-lg text-gray-900 flex items-center">
-                <FiFileText className="mr-2 text-indigo-500" /> Transaction Details
-              </h3>
-              <button onClick={() => setSelectedPaymentDetails(null)} className="text-gray-400 hover:text-red-500 transition">
-                <FiX className="text-2xl" />
+        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-3">
+          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden rounded-lg">
+            {/* Header */}
+            <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center shrink-0">
+              <div>
+                <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                  <FiFileText className="text-indigo-600" /> {selectedPaymentDetails.payment_id}
+                </h2>
+                <p className="text-[10px] text-gray-500">Transaction details</p>
+              </div>
+              <button
+                onClick={closeModal}
+                className="text-gray-500 hover:text-red-500"
+              >
+                <FiX size={20} />
               </button>
             </div>
-            
-            {/* Modal Body */}
-            <div className="p-5 space-y-4 text-sm text-gray-700">
-              
-              <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-3">
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Payment ID</p><p className="font-bold text-gray-900">{selectedPaymentDetails.payment_id}</p></div>
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Date</p><p className="font-bold">{new Date(selectedPaymentDetails.payment_date).toLocaleString()}</p></div>
-              </div>
 
-              <div className="grid grid-cols-2 gap-4 border-b border-gray-100 pb-3">
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Order Ref</p><p className="font-bold font-mono text-indigo-600">{selectedPaymentDetails.payment_type === "IN" ? selectedPaymentDetails.sale_invoice : selectedPaymentDetails.purchase_po}</p></div>
+            {/* Body (scrollable) */}
+            <div className="overflow-y-auto flex-1 p-4 space-y-4 text-sm text-gray-700">
+              {/* Payment Info */}
+              <div className="grid grid-cols-2 gap-3 border-b border-gray-200 pb-3">
                 <div>
-                  <p className="text-xs text-gray-500 uppercase mb-1">Amount</p>
-                  <p className={`font-black text-lg ${selectedPaymentDetails.payment_type === "IN" ? "text-green-600" : "text-red-600"}`}>
-                    ৳{parseFloat(selectedPaymentDetails.amount).toFixed(2)}
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Date</p>
+                  <p className="font-medium">
+                    {new Date(selectedPaymentDetails.payment_date).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Amount</p>
+                  <p
+                    className={`font-bold text-lg ${
+                      selectedPaymentDetails.payment_type === "IN" ? "text-green-600" : "text-red-600"
+                    }`}
+                  >
+                    ৳ {parseFloat(selectedPaymentDetails.amount).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Type</p>
+                  <p className="font-medium">
+                    {selectedPaymentDetails.payment_type === "IN" ? "Received (Sale)" : "Paid (Purchase)"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Reference</p>
+                  <p className="font-mono font-medium text-indigo-600">
+                    {selectedPaymentDetails.payment_type === "IN"
+                      ? selectedPaymentDetails.sale_invoice
+                      : selectedPaymentDetails.purchase_po}
                   </p>
                 </div>
               </div>
 
-              <div className="border-b border-gray-100 pb-3 bg-gray-50 p-3 rounded-lg border">
-                <p className="text-xs text-gray-500 uppercase font-bold mb-2">Method Details: <span className="text-gray-900">{selectedPaymentDetails.payment_method}</span></p>
-                
-                {selectedPaymentDetails.payment_method === 'Bank' && (
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <p><span className="text-gray-500">Bank:</span> {selectedPaymentDetails.bank_name}</p>
-                    <p><span className="text-gray-500">A/C Name:</span> {selectedPaymentDetails.bank_account_name}</p>
-                    <p><span className="text-gray-500">A/C No:</span> <span className="font-mono">{selectedPaymentDetails.bank_account_number}</span></p>
-                    {selectedPaymentDetails.bank_branch_name && <p><span className="text-gray-500">Branch:</span> {selectedPaymentDetails.bank_branch_name}</p>}
+              {/* Payment Method Details */}
+              <div className="bg-gray-50 p-3 rounded border border-gray-200">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Payment Method</p>
+                <p className="font-semibold">{selectedPaymentDetails.payment_method}</p>
+
+                {selectedPaymentDetails.payment_method === "Bank" && (
+                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm border-t border-gray-200 pt-2">
+                    <div>
+                      <span className="text-gray-500 text-[10px] uppercase">Bank</span>
+                      <p className="font-medium">{selectedPaymentDetails.bank_name}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] uppercase">A/C Name</span>
+                      <p className="font-medium">{selectedPaymentDetails.bank_account_name}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 text-[10px] uppercase">A/C No</span>
+                      <p className="font-mono">{selectedPaymentDetails.bank_account_number}</p>
+                    </div>
+                    {selectedPaymentDetails.bank_branch_name && (
+                      <div>
+                        <span className="text-gray-500 text-[10px] uppercase">Branch</span>
+                        <p>{selectedPaymentDetails.bank_branch_name}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {['Bkash', 'Nagad', 'Rocket'].includes(selectedPaymentDetails.payment_method) && (
-                  <p><span className="text-gray-500">Mobile No:</span> <span className="font-mono font-bold">{selectedPaymentDetails.mfs_mobile_number}</span></p>
+                {["Bkash", "Nagad", "Rocket"].includes(selectedPaymentDetails.payment_method) && (
+                  <div className="mt-2 border-t border-gray-200 pt-2">
+                    <span className="text-gray-500 text-[10px] uppercase">Mobile Number</span>
+                    <p className="font-mono font-bold">{selectedPaymentDetails.mfs_mobile_number}</p>
+                  </div>
                 )}
 
                 {selectedPaymentDetails.transaction_id && (
-                  <p className="mt-2"><span className="text-gray-500">Transaction ID:</span> <span className="font-mono">{selectedPaymentDetails.transaction_id}</span></p>
+                  <div className="mt-2 border-t border-gray-200 pt-2">
+                    <span className="text-gray-500 text-[10px] uppercase">Transaction ID</span>
+                    <p className="font-mono">{selectedPaymentDetails.transaction_id}</p>
+                  </div>
                 )}
-                {selectedPaymentDetails.payment_method === 'Cash' && <p className="text-gray-500 italic">Standard Hand Cash</p>}
+
+                {selectedPaymentDetails.payment_method === "Cash" && (
+                  <div className="mt-2 text-gray-500 italic">Hand Cash</div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Processed By</p><p className="font-medium text-gray-800">{selectedPaymentDetails.handled_by_name || "Unknown"}</p></div>
-              </div>
+              {selectedPaymentDetails.handled_by_name && (
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Processed By</p>
+                  <p className="font-medium">{selectedPaymentDetails.handled_by_name}</p>
+                </div>
+              )}
 
               {selectedPaymentDetails.remarks && (
-                <div><p className="text-xs text-gray-500 uppercase mb-1">Remarks</p><div className="bg-yellow-50 p-2 rounded text-yellow-800 border border-yellow-200">{selectedPaymentDetails.remarks}</div></div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Remarks</p>
+                  <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-yellow-800">
+                    {selectedPaymentDetails.remarks}
+                  </div>
+                </div>
               )}
+
+              {/* --- NEW: Products Table --- */}
+              <div>
+                <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                  {selectedPaymentDetails.payment_type === "IN" ? "Products Sold" : "Products Purchased"}
+                </h3>
+                {orderLoading ? (
+                  <div className="flex justify-center items-center p-4 text-gray-500">
+                    <FiLoader className="animate-spin mr-2" /> Loading products...
+                  </div>
+                ) : orderItems.length > 0 ? (
+                  <div className="border border-gray-300 overflow-hidden">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-gray-800 text-white">
+                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-left">
+                            Product & Brand
+                          </th>
+                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-center">
+                            Qty
+                          </th>
+                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
+                            {selectedPaymentDetails.payment_type === "IN" ? "Unit Price" : "Unit Cost"}
+                          </th>
+                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {orderItems.map((item, idx) => (
+                          <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <td className="border border-gray-300 px-2 py-1">
+                              <div className="text-xs font-medium text-gray-800">
+                                {item.product_name || "Product"}
+                              </div>
+                              <div className="text-[9px] text-gray-500 uppercase">
+                                {/* Brand might be nested; if not available, skip */}
+                                {item.brand_name || "—"}
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-center text-xs">
+                              {item.quantity}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-right font-mono text-xs">
+                              ৳ {parseFloat(item.unit_price_bdt || item.unit_cost_bdt || 0).toFixed(2)}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-right font-mono font-bold text-xs">
+                              ৳ {parseFloat(item.total_price_bdt || item.total_cost_bdt || 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center text-gray-400 text-sm py-2 border border-gray-200 rounded">
+                    No product details available for this transaction.
+                  </div>
+                )}
+              </div>
             </div>
-            
-            <div className="bg-gray-50 p-4 border-t border-gray-200">
-              <button onClick={() => setSelectedPaymentDetails(null)} className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 rounded-lg transition">Close</button>
+
+            {/* Footer */}
+            <div className="bg-gray-50 border-t border-gray-300 px-4 py-2 flex justify-end shrink-0">
+              <button
+                onClick={closeModal}
+                className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 border border-gray-300"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

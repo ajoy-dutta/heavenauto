@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
+import { FiArrowLeft, FiUserPlus, FiSave, FiEdit3 } from "react-icons/fi";
 
 export default function AddCustomer() {
   const navigate = useNavigate();
@@ -10,7 +11,7 @@ export default function AddCustomer() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  
+
   // State to hold the list of employees for the "Entry By" dropdown
   const [employeeList, setEmployeeList] = useState([]);
 
@@ -33,7 +34,7 @@ export default function AddCustomer() {
     market_name: "",
     referred_by: "",
     note_remarks: "",
-    entry_by: "" 
+    entry_by: "",
   });
 
   const [picture, setPicture] = useState(null);
@@ -42,7 +43,6 @@ export default function AddCustomer() {
     // 1. Fetch Employees for the dropdown
     const fetchEmployees = async () => {
       try {
-        // ✅ FIXED PATH: Added "person/" and fallback for DRF pagination
         const response = await axiosInstance.get("person/employees/");
         setEmployeeList(response.data.results || response.data);
       } catch (err) {
@@ -55,12 +55,12 @@ export default function AddCustomer() {
     if (isEditMode) {
       const prepopulatedData = { ...editData };
       // Convert nulls to empty strings for React inputs
-      Object.keys(prepopulatedData).forEach(key => {
+      Object.keys(prepopulatedData).forEach((key) => {
         if (prepopulatedData[key] === null) prepopulatedData[key] = "";
       });
       // If entry_by is an object, extract the ID
-      if (typeof prepopulatedData.entry_by === 'object' && prepopulatedData.entry_by !== null) {
-          prepopulatedData.entry_by = prepopulatedData.entry_by.id || prepopulatedData.entry_by.employee_id;
+      if (typeof prepopulatedData.entry_by === "object" && prepopulatedData.entry_by !== null) {
+        prepopulatedData.entry_by = prepopulatedData.entry_by.id || prepopulatedData.entry_by.employee_id;
       }
       setFormData(prepopulatedData);
     }
@@ -80,30 +80,24 @@ export default function AddCustomer() {
     setError("");
 
     const submitData = new FormData();
-    
+
     for (const key in formData) {
-      // Don't send read-only/auto fields or the picture string
       if (key !== "id" && key !== "customer_id" && key !== "picture" && key !== "entry_date_time") {
-        // Only append if it's not an empty string, OR if it's required. 
-        // Django handles empty strings better when they are actually sent as empty.
         submitData.append(key, formData[key]);
       }
     }
-    
-    // Attach the actual file if a new one was selected
+
     if (picture) {
       submitData.append("picture", picture);
     }
 
     try {
       if (isEditMode) {
-        // ✅ FIXED PATH: Added "person/"
         await axiosInstance.patch(`person/customers/${editData.id}/`, submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
         alert("Customer successfully updated!");
       } else {
-        // ✅ FIXED PATH: Added "person/"
         await axiosInstance.post("person/customers/", submitData, {
           headers: { "Content-Type": "multipart/form-data" },
         });
@@ -112,77 +106,105 @@ export default function AddCustomer() {
       navigate("/dashboard/customers");
     } catch (err) {
       console.log("DJANGO ERROR:", err.response?.data);
-      setError(`Failed to ${isEditMode ? 'update' : 'add'} customer. Please check required fields.`);
+      setError(`Failed to ${isEditMode ? "update" : "add"} customer. Please check required fields.`);
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-7xl mx-auto pb-10">
+    <div className="max-w-7xl mx-auto p-3 bg-gray-50 min-h-screen">
       {/* Header */}
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+        <div className="flex items-center gap-2">
+          <h1 className="text-xl font-bold flex items-center gap-2">
+            {isEditMode ? (
+              <FiEdit3 className="text-blue-600" />
+            ) : (
+              <FiUserPlus className="text-blue-600" />
+            )}
             {isEditMode ? "Edit Customer" : "Add New Customer"}
           </h1>
-          <p className="text-gray-500 mt-1">
-            {isEditMode ? `Updating records for ${editData.proprietor_name}` : "Create a new B2B or Retail client"}
-          </p>
+          {isEditMode && editData && (
+            <span className="text-xs bg-gray-200 text-gray-700 px-2 py-0.5 rounded-full font-semibold">
+              {editData.customer_id}
+            </span>
+          )}
         </div>
-        <Link 
+        <Link
           to="/dashboard/customers"
-          className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded transition duration-300"
+          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded text-sm font-semibold transition flex items-center gap-1.5 border border-gray-300"
         >
-          Cancel
+          <FiArrowLeft /> Cancel
         </Link>
       </div>
 
+      {/* Error Banner */}
       {error && (
-        <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 mb-6" role="alert">
-          <p className="font-bold">Error</p>
-          <p>{error}</p>
+        <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded flex items-start gap-2">
+          <div className="shrink-0 mt-0.5">⚠️</div>
+          <div>
+            <p className="font-bold">Error</p>
+            <p>{error}</p>
+          </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* --- CARD 1: Business Profile --- */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Business Profile</h2>
-            <div className="space-y-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <h2 className="text-sm font-bold text-gray-700 border-b pb-2 mb-3">Business Profile</h2>
+            <div className="space-y-3">
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Customer Type</label>
-                <select 
-                  name="customer_type" 
-                  value={formData.customer_type} 
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Customer Type
+                </label>
+                <select
+                  name="customer_type"
+                  value={formData.customer_type}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                 >
                   <option value="Retail">Retail</option>
                   <option value="Wholesale">Wholesale</option>
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Shop Name (If Wholesale)</label>
-                <input 
-                  type="text" name="shop_name" value={formData.shop_name} onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Shop Name
+                </label>
+                <input
+                  type="text"
+                  name="shop_name"
+                  value={formData.shop_name}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   placeholder="e.g., Heaven Autos Setup"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Proprietor Name *</label>
-                <input 
-                  type="text" name="proprietor_name" value={formData.proprietor_name} onChange={handleChange} required
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Proprietor Name *
+                </label>
+                <input
+                  type="text"
+                  name="proprietor_name"
+                  required
+                  value={formData.proprietor_name}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Employee / Buyer Name</label>
-                <input 
-                  type="text" name="employee_name" value={formData.employee_name} onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Employee / Buyer Name
+                </label>
+                <input
+                  type="text"
+                  name="employee_name"
+                  value={formData.employee_name}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   placeholder="Person picking up the goods"
                 />
               </div>
@@ -190,165 +212,246 @@ export default function AddCustomer() {
           </div>
 
           {/* --- CARD 2: Contact & Identity --- */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Contact & Identity</h2>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <h2 className="text-sm font-bold text-gray-700 border-b pb-2 mb-3">Contact & Identity</h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Primary Mobile *</label>
-                  <input 
-                    type="text" name="mobile1" value={formData.mobile1} onChange={handleChange} required
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Primary Mobile *
+                  </label>
+                  <input
+                    type="text"
+                    name="mobile1"
+                    required
+                    value={formData.mobile1}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Secondary Mobile</label>
-                  <input 
-                    type="text" name="mobile2" value={formData.mobile2} onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Secondary Mobile
+                  </label>
+                  <input
+                    type="text"
+                    name="mobile2"
+                    value={formData.mobile2}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Email Address</label>
-                <input 
-                  type="email" name="email" value={formData.email} onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Email Address
+                </label>
+                <input
+                  type="email"
+                  name="email"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Age</label>
-                  <input 
-                    type="number" name="age" value={formData.age} onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Age
+                  </label>
+                  <input
+                    type="number"
+                    name="age"
+                    value={formData.age}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">NID Number</label>
-                  <input 
-                    type="text" name="nid" value={formData.nid} onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    NID Number
+                  </label>
+                  <input
+                    type="text"
+                    name="nid"
+                    value={formData.nid}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Customer Photo</label>
-                <input 
-                  type="file" accept="image/*" onChange={handleFileChange}
-                  className="w-full p-2 border border-gray-300 rounded bg-gray-50"
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Customer Photo
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* --- CARD 3: Location Details --- */}
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Address Details</h2>
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+          <div className="bg-white p-4 rounded-lg border border-gray-300">
+            <h2 className="text-sm font-bold text-gray-700 border-b pb-2 mb-3">Address Details</h2>
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Division *</label>
-                  <input 
-                    type="text" name="division" value={formData.division} onChange={handleChange} required
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Division *
+                  </label>
+                  <input
+                    type="text"
+                    name="division"
+                    required
+                    value={formData.division}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">District *</label>
-                  <input 
-                    type="text" name="district" value={formData.district} onChange={handleChange} required
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    District *
+                  </label>
+                  <input
+                    type="text"
+                    name="district"
+                    required
+                    value={formData.district}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Police Station</label>
-                  <input 
-                    type="text" name="police_station" value={formData.police_station} onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Police Station
+                  </label>
+                  <input
+                    type="text"
+                    name="police_station"
+                    value={formData.police_station}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Post Office</label>
-                  <input 
-                    type="text" name="post_office" value={formData.post_office} onChange={handleChange}
-                    className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
+                  <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                    Post Office
+                  </label>
+                  <input
+                    type="text"
+                    name="post_office"
+                    value={formData.post_office}
+                    onChange={handleChange}
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                   />
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Town / Village *</label>
-                <input 
-                  type="text" name="town_village" value={formData.town_village} onChange={handleChange} required
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Market Name</label>
-                <input 
-                  type="text" name="market_name" value={formData.market_name} onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* --- CARD 4: Additional Info (Spans full width) --- */}
-          <div className="lg:col-span-3 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2">System & Notes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Referred By</label>
-                <input 
-                  type="text" name="referred_by" value={formData.referred_by} onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Entry By (Staff Member)</label>
-                <select 
-                  name="entry_by" 
-                  value={formData.entry_by} 
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Town / Village *
+                </label>
+                <input
+                  type="text"
+                  name="town_village"
+                  required
+                  value={formData.town_village}
                   onChange={handleChange}
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                >
-                  <option value="">-- Select Employee --</option>
-                  {employeeList.map(emp => (
-                    <option key={emp.id} value={emp.id}>
-                      {emp.full_name || emp.name} ({emp.employee_id})
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500 mt-1">Select the staff member registering this customer.</p>
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                />
               </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-bold text-gray-700 mb-1">Notes / Remarks</label>
-                <textarea 
-                  name="note_remarks" value={formData.note_remarks} onChange={handleChange} rows="3"
-                  className="w-full p-2 border border-gray-300 rounded focus:ring-red-500 focus:border-red-500"
-                ></textarea>
+              <div>
+                <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                  Market Name
+                </label>
+                <input
+                  type="text"
+                  name="market_name"
+                  value={formData.market_name}
+                  onChange={handleChange}
+                  className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                />
               </div>
-
             </div>
           </div>
+        </div>
 
+        {/* --- CARD 4: Additional Info (Spans full width) --- */}
+        <div className="bg-white p-4 rounded-lg border border-gray-300">
+          <h2 className="text-sm font-bold text-gray-700 border-b pb-2 mb-3">System & Notes</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                Referred By
+              </label>
+              <input
+                type="text"
+                name="referred_by"
+                value={formData.referred_by}
+                onChange={handleChange}
+                className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                Entry By (Staff Member)
+              </label>
+              <select
+                name="entry_by"
+                value={formData.entry_by}
+                onChange={handleChange}
+                className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+              >
+                <option value="">-- Select Employee --</option>
+                {employeeList.map((emp) => (
+                  <option key={emp.id} value={emp.id}>
+                    {emp.full_name || emp.name} ({emp.employee_id})
+                  </option>
+                ))}
+              </select>
+              <p className="text-[10px] text-gray-500 mt-0.5">Select the staff member registering this customer.</p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
+                Notes / Remarks
+              </label>
+              <textarea
+                name="note_remarks"
+                value={formData.note_remarks}
+                onChange={handleChange}
+                rows="3"
+                className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none"
+              ></textarea>
+            </div>
+          </div>
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-end mt-8">
-          <button 
-            type="submit" 
+        <div className="flex justify-end">
+          <button
+            type="submit"
             disabled={loading}
-            className={`flex items-center gap-2 text-white font-bold py-3 px-8 rounded shadow-lg transition duration-300 ${
-              loading ? "bg-red-400 cursor-not-allowed" : "bg-red-600 hover:bg-red-700"
+            className={`px-6 py-1.5 rounded text-sm font-bold text-white transition flex items-center gap-1.5 ${
+              loading
+                ? "bg-blue-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700 border border-blue-700"
             }`}
           >
-            {loading ? "Saving to Database..." : isEditMode ? "Update Customer Data" : "Save New Customer"}
+            <FiSave />
+            {loading
+              ? isEditMode
+                ? "Updating..."
+                : "Saving..."
+              : isEditMode
+              ? "Update Customer"
+              : "Save Customer"}
           </button>
         </div>
       </form>
