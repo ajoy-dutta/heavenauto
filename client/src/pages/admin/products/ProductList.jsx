@@ -208,7 +208,7 @@ export default function ProductList() {
           <thead className="bg-gray-50 text-gray-500 border-b border-gray-200">
             <tr>
               <th className="px-3 py-2 font-semibold w-10 text-center">Img</th>
-              <th className="px-3 py-2 font-semibold">Part Info</th>
+              <th className="px-3 py-2 font-semibold">Part Number</th>
               <th className="px-3 py-2 font-semibold">Name & Details</th>
               <th className="px-3 py-2 font-semibold">Source/Status</th>
               <th className="px-3 py-2 font-semibold text-right">Cost (৳)</th>
@@ -230,7 +230,7 @@ export default function ProductList() {
                     )}
                   </td>
                   <td className="px-3 py-1.5">
-                    <div className="font-mono text-gray-800 font-bold">{product.product_id}</div>
+                    <div className="font-mono text-gray-800 font-bold">{product.product_number}</div>
                     <div className="text-[10px] text-gray-500">{product.part_number || "No Part #"}</div>
                   </td>
                   <td className="px-3 py-1.5">

@@ -38,14 +38,13 @@ export default function StockList() {
   }, []);
 
   // --- DATA ENRICHMENT ---
-  // Merge stock data with product data to guarantee we have Category and Min Stock Level
   const enrichedStocks = stocks.map(stock => {
     const productDef = products.find(p => String(p.id) === String(stock.product)) || {};
     return {
       ...stock,
       brand_name: stock.brand || productDef.brand || "Generic",
       category: productDef.category || "Uncategorized",
-      min_stock_level: productDef.min_stock_level || 5, // Fallback to 5
+      min_stock_level: productDef.min_stock_level || 5,
       current_quantity: stock.current_quantity ?? 0
     };
   });
@@ -76,7 +75,6 @@ export default function StockList() {
     return groups;
   }, {});
 
-  // Minimal input classes
   const inputClass = "w-full pl-8 pr-2 py-1.5 text-xs bg-white border border-gray-300 rounded focus:outline-none focus:border-gray-800 transition-colors shadow-sm";
 
   return (
@@ -162,41 +160,43 @@ export default function StockList() {
           {Object.entries(groupedStocks).map(([brandName, brandStocks]) => (
             <div key={brandName} className="border border-gray-200 rounded shadow-sm overflow-hidden">
               
-              {/* Brand Header */}
-              <div className="bg-gray-100 border-b border-gray-200 p-2 text-xs font-bold text-gray-800 uppercase tracking-wider flex justify-between items-center">
+              {/* Brand Header – now black background */}
+              <div className="bg-black text-white border-b border-gray-800 p-2 text-xs font-bold uppercase tracking-wider flex justify-between items-center">
                 <span>Brand: {brandName}</span>
-                <span className="text-[10px] bg-white px-2 py-0.5 rounded border border-gray-300 text-gray-500">
+                <span className="text-[10px] bg-gray-800 px-2 py-0.5 rounded border border-gray-600 text-gray-300">
                   {brandStocks.length} Items
                 </span>
               </div>
 
-              {/* Brand Table */}
+              {/* Brand Table – new column order: SL, Part No., Status, Product Name, Category, In Stock, Min */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs whitespace-nowrap">
                   <thead className="bg-white text-gray-500 border-b border-gray-100">
                     <tr>
-                      <th className="px-3 py-2 font-semibold w-8">Status</th>
-                      <th className="px-3 py-2 font-semibold">Product Name</th>
+                      <th className="px-3 py-2 font-semibold w-8">SL</th>
                       <th className="px-3 py-2 font-semibold">Part No.</th>
+                      <th className="px-3 py-2 font-semibold w-8 text-center">Status</th>
+                      <th className="px-3 py-2 font-semibold">Product Name</th>
                       <th className="px-3 py-2 font-semibold">Category</th>
                       <th className="px-3 py-2 font-semibold text-right">In Stock</th>
                       <th className="px-3 py-2 font-semibold text-right text-[10px] text-gray-400">Min.</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {brandStocks.map((stock) => {
+                    {brandStocks.map((stock, idx) => {
                       const isOutOfStock = stock.current_quantity <= 0;
                       const isLowStock = !isOutOfStock && stock.current_quantity <= stock.min_stock_level;
                       
                       return (
                         <tr key={stock.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 py-1.5 text-center text-gray-400">{idx + 1}</td>
+                          <td className="px-3 py-1.5 font-mono text-gray-500">{stock.part_number || "-"}</td>
                           <td className="px-3 py-1.5 text-center">
                             <div className={`w-2.5 h-2.5 rounded-full mx-auto shadow-sm ${
                               isOutOfStock ? 'bg-red-500' : isLowStock ? 'bg-amber-400' : 'bg-emerald-400'
                             }`} title={isOutOfStock ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'Healthy'} />
                           </td>
                           <td className="px-3 py-1.5 font-medium text-gray-800">{stock.product_name}</td>
-                          <td className="px-3 py-1.5 text-gray-500 font-mono">{stock.part_number || "-"}</td>
                           <td className="px-3 py-1.5 text-gray-500">{stock.category}</td>
                           <td className="px-3 py-1.5 text-right font-bold">
                             <span className={isOutOfStock ? 'text-red-600' : isLowStock ? 'text-amber-600' : 'text-gray-800'}>
@@ -219,5 +219,3 @@ export default function StockList() {
     </div>
   );
 }
-
-// Nothing

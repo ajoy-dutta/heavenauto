@@ -131,7 +131,10 @@ export default function AddSale() {
       if (selectedProduct) {
         newItems[index].product = value;
         newItems[index].unit_price_bdt = selectedProduct.retail_price_bdt || 0;
-        newItems[index].search = selectedProduct.product_name || selectedProduct.name || "";
+        // Show part number + name after selection
+        const partNum = selectedProduct.part_number || "";
+        const name = selectedProduct.product_name || selectedProduct.name || "";
+        newItems[index].search = partNum ? `${partNum} - ${name}` : name;
         newItems[index].showDropdown = false;
       }
       // Auto‑add a new empty row if this is the last row
@@ -152,7 +155,7 @@ export default function AddSale() {
     }
   };
 
-  // Filter products by search text and exclude already selected items
+  // Filter products by search text (part_number, name, brand) and exclude already selected items
   const getFilteredProducts = (searchText) => {
     const lowerSearch = searchText.toLowerCase();
     
@@ -166,7 +169,8 @@ export default function AddSale() {
       
       const name = (p.product_name || p.name || "").toLowerCase();
       const brand = getBrandName(p.brand).toLowerCase();
-      return name.includes(lowerSearch) || brand.includes(lowerSearch);
+      const part = (p.part_number || "").toLowerCase();
+      return name.includes(lowerSearch) || brand.includes(lowerSearch) || part.includes(lowerSearch);
     });
   };
 
@@ -220,6 +224,7 @@ export default function AddSale() {
         const newBatchItems = productsToAdd.map((p) => ({
           product: p.id,
           product_name: p.product_name || p.name,
+          part_number: p.part_number || "",
           brand_name: getBrandName(p.brand),
           purchase_cost_bdt: p.purchase_cost_bdt || 0,
           unit_price_bdt: p.retail_price_bdt || "",
@@ -535,6 +540,7 @@ export default function AddSale() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-800 text-white">
+                <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">#</th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
                   Product & Brand
                 </th>
@@ -562,8 +568,12 @@ export default function AddSale() {
               {entryMode === "brand" &&
                 brandItems.map((item, index) => (
                   <tr key={item.product} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center text-xs text-gray-500">{index + 1}</td>
                     <td className="border border-gray-300 px-2 py-1.5">
-                      <div className="font-medium text-gray-800 text-xs">{item.product_name}</div>
+                      <div className="font-medium text-gray-800 text-xs">
+                        {item.part_number && <span className="text-blue-600 mr-1">{item.part_number}</span>}
+                        {item.product_name}
+                      </div>
                       <div className="text-[9px] text-gray-500 uppercase">{item.brand_name}</div>
                     </td>
                     <td className="border border-gray-300 px-2 py-1.5 text-center">
@@ -633,11 +643,13 @@ export default function AddSale() {
                   const purchaseCost = selectedProd
                     ? parseFloat(selectedProd.purchase_cost_bdt).toFixed(2)
                     : "-";
+                  const partNumber = selectedProd?.part_number || "";
 
                   const filteredProducts = getFilteredProducts(item.search || "");
 
                   return (
                     <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                      <td className="border border-gray-300 px-2 py-3 text-center text-xs text-gray-500">{index + 1}</td>
                       {/* FIX IMPLEMENTED HERE: Added conditional z-index so open dropdowns jump to the front layer over the below rows */}
                       <td className={`border border-gray-300 px-2 py-3 overflow-visible ${item.showDropdown ? 'relative z-50' : 'relative z-10'}`}>
                         <div ref={(el) => (dropdownRefs.current[index] = el)}>
@@ -645,7 +657,7 @@ export default function AddSale() {
                             <FiSearch className="ml-1.5 text-gray-400" size={12} />
                             <input
                               type="text"
-                              placeholder="Search product..."
+                              placeholder="Search by part number or name..."
                               value={item.search || ""}
                               onChange={(e) =>
                                 handleManualItemChange(index, "search", e.target.value)
@@ -689,6 +701,7 @@ export default function AddSale() {
                                       }}
                                     >
                                       <span>
+                                        <span className="font-mono text-blue-600">{p.part_number || ""}</span>{" "}
                                         {p.product_name || p.name}{" "}
                                         <span className="text-[10px] text-gray-500">
                                           ({getBrandName(p.brand)})
@@ -708,9 +721,10 @@ export default function AddSale() {
                             </div>
                           )}
                         </div>
-                        {manualBrandName && (
-                          <div className="text-[9px] text-gray-500 uppercase mt-0.5">
-                            {manualBrandName}
+                        {selectedProd && (
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[9px] text-gray-600">
+                            {partNumber && <span className="font-mono text-blue-600">{partNumber}</span>}
+                            <span className="uppercase">{manualBrandName}</span>
                           </div>
                         )}
                       </td>
@@ -777,7 +791,7 @@ export default function AddSale() {
 
               {entryMode === "brand" && brandItems.length === 0 && (
                 <tr>
-                  <td colSpan="7" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
+                  <td colSpan="8" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
                     Use the brand selector above to load products.
                   </td>
                 </tr>

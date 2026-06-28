@@ -43,31 +43,44 @@ export default function AddPurchase() {
   ]);
   const [brandItems, setBrandItems] = useState([]);
 
+  // --- NEW SUPPLIER MODAL ---
+  const [showSupplierModal, setShowSupplierModal] = useState(false);
+  const [newSupplier, setNewSupplier] = useState({
+    name: "",
+    contact_person: "",
+    phone: "",
+    email: "",
+    address: "",
+  });
+  const [addingSupplier, setAddingSupplier] = useState(false);
+  const [supplierError, setSupplierError] = useState("");
+
   // Refs for dropdown outside click handling
   const dropdownRefs = useRef({});
 
   // --- FETCH DATA ---
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [prodRes, empRes, supRes, brandRes, stockRes] = await Promise.all([
-          axiosInstance.get("products/"),
-          axiosInstance.get("person/employees/"),
-          axiosInstance.get("supplier/suppliers/"),
-          axiosInstance.get("brand/brands/"),
-          axiosInstance.get("stock/stocks/"),
-        ]);
+  const fetchData = async () => {
+    try {
+      const [prodRes, empRes, supRes, brandRes, stockRes] = await Promise.all([
+        axiosInstance.get("products/"),
+        axiosInstance.get("person/employees/"),
+        axiosInstance.get("supplier/suppliers/"),
+        axiosInstance.get("brand/brands/"),
+        axiosInstance.get("stock/stocks/"),
+      ]);
 
-        setProducts(prodRes.data.results || prodRes.data);
-        setEmployees(empRes.data.results || empRes.data);
-        setSuppliers(supRes.data.results || supRes.data);
-        setBrands(brandRes.data.results || brandRes.data);
-        setStocks(stockRes.data.results || stockRes.data);
-      } catch (err) {
-        console.error("Failed to fetch data", err);
-        setError("Warning: Could not load initial data. Check server connection.");
-      }
-    };
+      setProducts(prodRes.data.results || prodRes.data);
+      setEmployees(empRes.data.results || empRes.data);
+      setSuppliers(supRes.data.results || supRes.data);
+      setBrands(brandRes.data.results || brandRes.data);
+      setStocks(stockRes.data.results || stockRes.data);
+    } catch (err) {
+      console.error("Failed to fetch data", err);
+      setError("Warning: Could not load initial data. Check server connection.");
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -86,6 +99,51 @@ export default function AddPurchase() {
   // --- HEADER HANDLERS ---
   const handleOrderChange = (e) => {
     setOrderData({ ...orderData, [e.target.name]: e.target.value });
+  };
+
+  // --- NEW SUPPLIER HANDLERS ---
+  const handleNewSupplierChange = (e) => {
+    setNewSupplier({ ...newSupplier, [e.target.name]: e.target.value });
+  };
+
+  const handleAddSupplierSubmit = async (e) => {
+    e.preventDefault();
+    setAddingSupplier(true);
+    setSupplierError("");
+
+    // Simple validation
+    if (!newSupplier.name.trim()) {
+      setSupplierError("Supplier name is required.");
+      setAddingSupplier(false);
+      return;
+    }
+
+    try {
+      const response = await axiosInstance.post("supplier/suppliers/", newSupplier);
+      const createdSupplier = response.data;
+
+      // Refresh supplier list (re-fetch)
+      const supRes = await axiosInstance.get("supplier/suppliers/");
+      setSuppliers(supRes.data.results || supRes.data);
+
+      // Auto-select the new supplier
+      setOrderData((prev) => ({ ...prev, supplier: createdSupplier.id }));
+
+      // Close modal and reset form
+      setShowSupplierModal(false);
+      setNewSupplier({ name: "", contact_person: "", phone: "", email: "", address: "" });
+    } catch (err) {
+      console.error("Failed to create supplier", err);
+      setSupplierError(err.response?.data?.detail || "Failed to add supplier. Please check your input.");
+    } finally {
+      setAddingSupplier(false);
+    }
+  };
+
+  const closeSupplierModal = () => {
+    setShowSupplierModal(false);
+    setSupplierError("");
+    setNewSupplier({ name: "", contact_person: "", phone: "", email: "", address: "" });
   };
 
   // --- MANUAL MODE (with duplicate prevention & z-index fix) ---
@@ -112,7 +170,10 @@ export default function AddPurchase() {
       if (selectedProduct) {
         newItems[index].product = value;
         newItems[index].unit_cost_bdt = selectedProduct.purchase_cost_bdt || "";
-        newItems[index].search = selectedProduct.product_name || selectedProduct.name || "";
+        // Show part number + name after selection
+        const partNum = selectedProduct.part_number || "";
+        const name = selectedProduct.product_name || selectedProduct.name || "";
+        newItems[index].search = partNum ? `${partNum} - ${name}` : name;
         newItems[index].showDropdown = false;
       }
       // Auto‑add a new empty row if this is the last row
@@ -133,19 +194,19 @@ export default function AddPurchase() {
     }
   };
 
-  // Filter products – exclude already selected ones
+  // Filter products – include part_number in search, exclude already selected ones
   const getFilteredProducts = (searchText) => {
     const lowerSearch = searchText.toLowerCase();
-    // Get all product IDs that are already selected in manual rows
     const selectedProductIds = manualItems
       .map((item) => String(item.product))
       .filter((id) => id !== "");
 
     return products.filter((p) => {
-      if (selectedProductIds.includes(String(p.id))) return false; // Exclude already selected
+      if (selectedProductIds.includes(String(p.id))) return false;
       const name = (p.product_name || p.name || "").toLowerCase();
       const brand = getBrandName(p.brand).toLowerCase();
-      return name.includes(lowerSearch) || brand.includes(lowerSearch);
+      const part = (p.part_number || "").toLowerCase();
+      return name.includes(lowerSearch) || brand.includes(lowerSearch) || part.includes(lowerSearch);
     });
   };
 
@@ -197,6 +258,7 @@ export default function AddPurchase() {
         const newBatchItems = productsToAdd.map((p) => ({
           product: p.id,
           product_name: p.product_name || p.name,
+          part_number: p.part_number || "",
           brand_name: getBrandName(p.brand),
           unit_cost_bdt: p.purchase_cost_bdt || "",
           quantity: "",
@@ -317,20 +379,29 @@ export default function AddPurchase() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 p-2 bg-gray-50 border-b border-gray-300">
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Supplier *</label>
-            <select
-              name="supplier"
-              required
-              value={orderData.supplier}
-              onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value="">-- Select Supplier --</option>
-              {suppliers.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name || s.company_name}
-                </option>
-              ))}
-            </select>
+            <div className="flex gap-1">
+              <select
+                name="supplier"
+                required
+                value={orderData.supplier}
+                onChange={handleOrderChange}
+                className="flex-1 bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+              >
+                <option value="">-- Select Supplier --</option>
+                {suppliers.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name || s.company_name}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setShowSupplierModal(true)}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded border border-blue-700 transition flex items-center gap-0.5"
+              >
+                <FiPlus size={14} /> Add
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Invoice No.</label>
@@ -445,6 +516,7 @@ export default function AddPurchase() {
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-800 text-white">
+                <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">#</th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">Product & Brand</th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">Stock</th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">Unit Cost</th>
@@ -457,8 +529,12 @@ export default function AddPurchase() {
               {entryMode === "brand" &&
                 brandItems.map((item, index) => (
                   <tr key={item.product} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    <td className="border border-gray-300 px-2 py-1.5 text-center text-xs text-gray-500">{index + 1}</td>
                     <td className="border border-gray-300 px-2 py-1.5">
-                      <div className="font-medium text-gray-800 text-xs">{item.product_name}</div>
+                      <div className="font-medium text-gray-800 text-xs">
+                        {item.part_number && <span className="text-blue-600 mr-1">{item.part_number}</span>}
+                        {item.product_name}
+                      </div>
                       <div className="text-[9px] text-gray-500 uppercase">{item.brand_name}</div>
                     </td>
                     <td className="border border-gray-300 px-2 py-1.5 text-center">
@@ -503,18 +579,20 @@ export default function AddPurchase() {
                   const selectedProd = products.find((p) => String(p.id) === String(item.product));
                   const manualBrandName = selectedProd ? getBrandName(selectedProd.brand) : "";
                   const currentStock = selectedProd ? getProductStock(selectedProd.id) : "-";
+                  const partNumber = selectedProd?.part_number || "";
+                  const productName = selectedProd ? (selectedProd.product_name || selectedProd.name) : "";
                   const filteredProducts = getFilteredProducts(item.search || "");
 
                   return (
                     <tr key={index} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                      {/* --- FIX: conditional z-index so open dropdown jumps above other rows --- */}
+                      <td className="border border-gray-300 px-2 py-3 text-center text-xs text-gray-500">{index + 1}</td>
                       <td className={`border border-gray-300 px-2 py-3 overflow-visible ${item.showDropdown ? 'relative z-50' : 'relative z-10'}`}>
                         <div ref={(el) => (dropdownRefs.current[index] = el)}>
                           <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-blue-500">
                             <FiSearch className="ml-1.5 text-gray-400" size={12} />
                             <input
                               type="text"
-                              placeholder="Search product..."
+                              placeholder="Search by part number or name..."
                               value={item.search || ""}
                               onChange={(e) => handleManualItemChange(index, "search", e.target.value)}
                               onFocus={() => {
@@ -556,6 +634,7 @@ export default function AddPurchase() {
                                       }}
                                     >
                                       <span>
+                                        <span className="font-mono text-blue-600">{p.part_number || ""}</span>{" "}
                                         {p.product_name || p.name}{" "}
                                         <span className="text-[10px] text-gray-500">({getBrandName(p.brand)})</span>
                                       </span>
@@ -569,7 +648,12 @@ export default function AddPurchase() {
                             </div>
                           )}
                         </div>
-                        {manualBrandName && <div className="text-[9px] text-gray-500 uppercase mt-0.5">{manualBrandName}</div>}
+                        {selectedProd && (
+                          <div className="mt-0.5 flex flex-wrap items-center gap-1 text-[9px] text-gray-600">
+                            {partNumber && <span className="font-mono text-blue-600">{partNumber}</span>}
+                            <span className="uppercase">{manualBrandName}</span>
+                          </div>
+                        )}
                       </td>
                       <td className="border border-gray-300 px-2 py-3 text-center">
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${currentStock !== "-" && currentStock <= 5 ? "bg-red-100 text-red-600" : "text-gray-600"}`}>
@@ -613,7 +697,7 @@ export default function AddPurchase() {
 
               {entryMode === "brand" && brandItems.length === 0 && (
                 <tr>
-                  <td colSpan="6" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
+                  <td colSpan="7" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
                     Use the brand selector above to load products.
                   </td>
                 </tr>
@@ -647,6 +731,98 @@ export default function AddPurchase() {
           </button>
         </div>
       </form>
+
+      {/* --- NEW SUPPLIER MODAL --- */}
+      {showSupplierModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative">
+            <button
+              type="button"
+              onClick={closeSupplierModal}
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-700"
+            >
+              <FiX size={20} />
+            </button>
+            <h2 className="text-lg font-bold mb-4">Add New Supplier</h2>
+            {supplierError && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded">
+                {supplierError}
+              </div>
+            )}
+            <form onSubmit={handleAddSupplierSubmit}>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Name *</label>
+                  <input
+                    type="text"
+                    name="name"
+                    required
+                    value={newSupplier.name}
+                    onChange={handleNewSupplierChange}
+                    className="w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Contact Person</label>
+                  <input
+                    type="text"
+                    name="contact_person"
+                    value={newSupplier.contact_person}
+                    onChange={handleNewSupplierChange}
+                    className="w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</label>
+                  <input
+                    type="text"
+                    name="phone"
+                    value={newSupplier.phone}
+                    onChange={handleNewSupplierChange}
+                    className="w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={newSupplier.email}
+                    onChange={handleNewSupplierChange}
+                    className="w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider">Address</label>
+                  <input
+                    type="text"
+                    name="address"
+                    value={newSupplier.address}
+                    onChange={handleNewSupplierChange}
+                    className="w-full border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={closeSupplierModal}
+                  className="px-4 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingSupplier}
+                  className={`px-4 py-1.5 rounded text-sm font-bold text-white transition ${addingSupplier ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
+                >
+                  {addingSupplier ? "Adding..." : "Add Supplier"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

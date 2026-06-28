@@ -83,6 +83,16 @@ export default function PurchaseHistory() {
     return brand ? brand.name : "Unknown Brand";
   };
 
+  // Helper to get part number from product
+  const getProductPartNumber = (item) => {
+    if (!item) return "N/A";
+    let product = products.find((p) => String(p.id) === String(item.product));
+    if (!product) {
+      product = products.find((p) => p.product_name === item.product_name);
+    }
+    return product?.part_number || "N/A";
+  };
+
   // --- STATS ---
   const stats = useMemo(() => {
     const total = purchases.reduce((sum, p) => {
@@ -125,7 +135,6 @@ export default function PurchaseHistory() {
       await axiosInstance.patch(`purchase/purchases/${editFormData.id}/`, {
         payment_status: editFormData.payment_status,
         remarks: editFormData.remarks,
-        // Optionally, you can also allow updating supplier/invoice if needed, but we keep them read-only
       });
       fetchData();
       setIsEditModalOpen(false);
@@ -361,7 +370,7 @@ export default function PurchaseHistory() {
         )}
       </div>
 
-      {/* --- EDIT / VIEW MODAL (Read‑only supplier & entry_by) --- */}
+      {/* --- EDIT / VIEW MODAL with SL, Part Number & Product Name --- */}
       {isEditModalOpen && editFormData && (
         <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-3">
           <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden rounded-lg">
@@ -383,7 +392,7 @@ export default function PurchaseHistory() {
 
             {/* Body (scrollable) */}
             <div className="overflow-y-auto flex-1 p-4 space-y-4">
-              {/* Products Table (Read‑only) */}
+              {/* Products Table – with SL, Part Number + Product Name */}
               <div>
                 <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
                   Products Received
@@ -392,8 +401,11 @@ export default function PurchaseHistory() {
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-800 text-white">
+                        <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-center">
+                          SL
+                        </th>
                         <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-left">
-                          Product & Brand
+                          Part No / Product
                         </th>
                         <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-center">
                           Qty
@@ -407,27 +419,33 @@ export default function PurchaseHistory() {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedItems.map((item, idx) => (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="border border-gray-300 px-2 py-1">
-                            <div className="text-xs font-medium text-gray-800">
-                              {item.product_name}
-                            </div>
-                            <div className="text-[9px] text-gray-500 uppercase">
-                              {getBrandName(item)}
-                            </div>
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1 text-center text-xs">
-                            {item.quantity}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1 text-right font-mono text-xs">
-                            ৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1 text-right font-mono font-bold text-xs">
-                            ৳ {parseFloat(item.total_cost_bdt).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
+                      {selectedItems.map((item, idx) => {
+                        const partNumber = getProductPartNumber(item);
+                        return (
+                          <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                            <td className="border border-gray-300 px-2 py-1 text-center text-xs">
+                              {idx + 1}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1">
+                              <div className="text-xs font-bold text-gray-800">
+                                {partNumber}
+                              </div>
+                              <div className="text-[10px] text-gray-500">
+                                {item.product_name}
+                              </div>
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-center text-xs">
+                              {item.quantity}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-right font-mono text-xs">
+                              ৳ {parseFloat(item.unit_cost_bdt).toFixed(2)}
+                            </td>
+                            <td className="border border-gray-300 px-2 py-1 text-right font-mono font-bold text-xs">
+                              ৳ {parseFloat(item.total_cost_bdt).toFixed(2)}
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
