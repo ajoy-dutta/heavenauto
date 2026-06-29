@@ -4,10 +4,11 @@ from stock.models import Stock # <-- Import Stock to check availability
 
 class SaleItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.product_name', read_only=True)
+    part_number = serializers.CharField(source='product.part_number', read_only=True)
 
     class Meta:
         model = SaleItem
-        fields = ['id', 'product', 'product_name', 'quantity', 'unit_price_bdt', 'total_price_bdt', 'profit_bdt']
+        fields = ['id', 'product', 'product_name', 'part_number', 'quantity', 'unit_price_bdt', 'total_price_bdt', 'profit_bdt']
         read_only_fields = ['total_price_bdt', 'profit_bdt']
 
 class SaleOrderSerializer(serializers.ModelSerializer):

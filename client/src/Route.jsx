@@ -23,6 +23,7 @@ import SaleHistory from './pages/admin/sales/SaleHistory';
 import AddSale from './pages/admin/sales/AddSale';
 import Payments from './pages/admin/payment/Payments';
 import PaymentHistory from './pages/admin/payment/PaymentHistory';
+import ViewPaymentdetails from './pages/admin/payment/ViewPaymentdetails'; // <-- ADDED: Imported new view page
 import CapitalEntries from './pages/admin/finance/CapitalEntries';
 import ExpenseList from "./pages/admin/finance/ExpenseList";
 import AddExpense from "./pages/admin/finance/AddExpense";
@@ -86,11 +87,12 @@ export const router = createBrowserRouter([
 
       // Master Data Routes
       { path: "brands", element: <Brand /> },
-      { path: "suppliers", element: <Supplier /> }, // <-- ADDED COMMA HERE
+      { path: "suppliers", element: <Supplier /> },
 
       // Payment Routes
       { path: "payments", element: <Payments /> },
-      { path: "payment-history", element: <PaymentHistory /> } // <-- ADD THIS
+      { path: "payment-history", element: <PaymentHistory /> },
+      { path: "payments/view/:id", element: <ViewPaymentdetails /> } // <-- ADDED: The new route
     ],
   },
 ]);

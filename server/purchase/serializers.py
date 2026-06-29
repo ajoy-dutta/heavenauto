@@ -3,10 +3,11 @@ from .models import PurchaseOrder, PurchaseItem
 
 class PurchaseItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source='product.product_name', read_only=True)
+    part_number = serializers.CharField(source='product.part_number', read_only=True)
 
     class Meta:
         model = PurchaseItem
-        fields = ['id', 'product', 'product_name', 'quantity', 'unit_cost_bdt', 'total_cost_bdt']
+        fields = ['id', 'product', 'product_name','part_number', 'quantity', 'unit_cost_bdt', 'total_cost_bdt']
         read_only_fields = ['total_cost_bdt']
 
 class PurchaseOrderSerializer(serializers.ModelSerializer):

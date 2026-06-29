@@ -1,21 +1,20 @@
 import { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom"; // <-- Added import
 import axiosInstance from "../../../api/axios";
 import {
   FiSearch,
   FiFilter,
   FiPrinter,
   FiEye,
-  FiX,
   FiFileText,
   FiClock,
   FiCheckSquare,
   FiDollarSign,
   FiList,
-  FiCalendar,
-  FiLoader,
 } from "react-icons/fi";
 
 export default function PaymentHistory() {
+  const navigate = useNavigate(); // <-- Initialize navigate
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -27,58 +26,6 @@ export default function PaymentHistory() {
 
   // Selection for Printing
   const [selectedIds, setSelectedIds] = useState([]);
-
-  // Modal Details
-  const [selectedPaymentDetails, setSelectedPaymentDetails] = useState(null);
-  const [orderItems, setOrderItems] = useState([]);
-  const [orderLoading, setOrderLoading] = useState(false);
-
-  // Fetch products for a given order (sale or purchase)
-  const fetchOrderItems = async (payment) => {
-    setOrderLoading(true);
-    setOrderItems([]);
-
-    try {
-      let orderId = null;
-      let endpoint = "";
-
-      if (payment.payment_type === "IN" && payment.sale) {
-        orderId = payment.sale;
-        endpoint = `sale/sales/${orderId}/`;
-      } else if (payment.payment_type === "OUT" && payment.purchase) {
-        orderId = payment.purchase;
-        endpoint = `purchase/purchases/${orderId}/`;
-      } else {
-        // Fallback: maybe the payment has a reference string but not the ID – we can try to fetch by invoice/PO?
-        // For now, just leave empty.
-        setOrderLoading(false);
-        return;
-      }
-
-      const res = await axiosInstance.get(endpoint);
-      const orderData = res.data;
-      // Extract items – the field might be 'items' or 'order_items' depending on your API.
-      // Sale: items, Purchase: items. We'll use 'items'.
-      const items = orderData.items || [];
-      setOrderItems(items);
-    } catch (err) {
-      console.error("Failed to fetch order items", err);
-      setOrderItems([]);
-    } finally {
-      setOrderLoading(false);
-    }
-  };
-
-  // When modal opens, fetch items
-  const openModal = (payment) => {
-    setSelectedPaymentDetails(payment);
-    fetchOrderItems(payment);
-  };
-
-  const closeModal = () => {
-    setSelectedPaymentDetails(null);
-    setOrderItems([]);
-  };
 
   useEffect(() => {
     fetchPayments();
@@ -106,13 +53,7 @@ export default function PaymentHistory() {
       .reduce((sum, p) => sum + parseFloat(p.amount || 0), 0);
     const net = totalIn - totalOut;
     const count = payments.length;
-    const latest =
-      payments.length > 0
-        ? payments.reduce((latest, p) =>
-            new Date(p.payment_date) > new Date(latest.payment_date) ? p : latest
-          ).payment_date
-        : null;
-    return { totalIn, totalOut, net, count, latest };
+    return { totalIn, totalOut, net, count };
   }, [payments]);
 
   // --- FILTERING ---
@@ -176,7 +117,6 @@ export default function PaymentHistory() {
             th, td { border: 1px solid #e5e7eb; padding: 10px; text-align: left; }
             th { background-color: #f9fafb; font-weight: bold; text-transform: uppercase; font-size: 12px; }
             .text-right { text-align: right; }
-            .text-center { text-align: center; }
             .in { color: #16a34a; font-weight: bold; }
             .out { color: #dc2626; font-weight: bold; }
             .summary { display: flex; justify-content: flex-end; margin-top: 20px; }
@@ -214,11 +154,7 @@ export default function PaymentHistory() {
                   <td>${p.payment_type === "IN" ? p.sale_invoice : p.purchase_po}</td>
                   <td>
                     ${p.payment_method}
-                    ${
-                      p.transaction_id
-                        ? `<br><small style="color:#6b7280">Trx: ${p.transaction_id}</small>`
-                        : ""
-                    }
+                    ${p.transaction_id ? `<br><small style="color:#6b7280">Trx: ${p.transaction_id}</small>` : ""}
                   </td>
                   <td class="text-right ${p.payment_type === "IN" ? "in" : "out"}">
                     ${p.payment_type === "IN" ? "+" : "-"} ৳${parseFloat(p.amount).toFixed(2)}
@@ -275,9 +211,7 @@ export default function PaymentHistory() {
         <div className="p-2 border-r border-gray-300 flex items-center gap-2">
           <FiDollarSign className="text-green-600 text-lg" />
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-              Received
-            </p>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Received</p>
             <p className="text-lg font-bold text-green-700">
               ৳ {stats.totalIn.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
@@ -286,9 +220,7 @@ export default function PaymentHistory() {
         <div className="p-2 border-r border-gray-300 flex items-center gap-2">
           <FiDollarSign className="text-red-600 text-lg" />
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-              Paid Out
-            </p>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Paid Out</p>
             <p className="text-lg font-bold text-red-700">
               ৳ {stats.totalOut.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
@@ -297,9 +229,7 @@ export default function PaymentHistory() {
         <div className="p-2 border-r border-gray-300 flex items-center gap-2">
           <FiDollarSign className="text-indigo-600 text-lg" />
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-              Net Balance
-            </p>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Net Balance</p>
             <p className={`text-lg font-bold ${stats.net >= 0 ? "text-green-600" : "text-red-600"}`}>
               ৳ {stats.net.toLocaleString(undefined, { minimumFractionDigits: 2 })}
             </p>
@@ -308,9 +238,7 @@ export default function PaymentHistory() {
         <div className="p-2 flex items-center gap-2">
           <FiList className="text-indigo-600 text-lg" />
           <div>
-            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
-              Transactions
-            </p>
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Transactions</p>
             <p className="text-lg font-bold text-gray-800">{stats.count}</p>
           </div>
         </div>
@@ -456,8 +384,9 @@ export default function PaymentHistory() {
                         {pay.payment_type === "IN" ? "+" : "-"} ৳{parseFloat(pay.amount).toFixed(2)}
                       </td>
                       <td className="border border-gray-300 px-2 py-1.5 text-center">
+                        {/* --- CHANGED: Navigates to details page instead of opening modal --- */}
                         <button
-                          onClick={() => openModal(pay)}
+                          onClick={() => navigate(`/dashboard/payments/view/${pay.id}`)}
                           className="text-indigo-600 hover:text-indigo-800 transition p-0.5"
                           title="View Full Details"
                         >
@@ -472,200 +401,6 @@ export default function PaymentHistory() {
           </div>
         )}
       </div>
-
-      {/* --- DETAILS MODAL --- */}
-      {selectedPaymentDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex justify-center items-center z-50 p-3">
-          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden rounded-lg">
-            {/* Header */}
-            <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center shrink-0">
-              <div>
-                <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                  <FiFileText className="text-indigo-600" /> {selectedPaymentDetails.payment_id}
-                </h2>
-                <p className="text-[10px] text-gray-500">Transaction details</p>
-              </div>
-              <button
-                onClick={closeModal}
-                className="text-gray-500 hover:text-red-500"
-              >
-                <FiX size={20} />
-              </button>
-            </div>
-
-            {/* Body (scrollable) */}
-            <div className="overflow-y-auto flex-1 p-4 space-y-4 text-sm text-gray-700">
-              {/* Payment Info */}
-              <div className="grid grid-cols-2 gap-3 border-b border-gray-200 pb-3">
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Date</p>
-                  <p className="font-medium">
-                    {new Date(selectedPaymentDetails.payment_date).toLocaleString()}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Amount</p>
-                  <p
-                    className={`font-bold text-lg ${
-                      selectedPaymentDetails.payment_type === "IN" ? "text-green-600" : "text-red-600"
-                    }`}
-                  >
-                    ৳ {parseFloat(selectedPaymentDetails.amount).toFixed(2)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Type</p>
-                  <p className="font-medium">
-                    {selectedPaymentDetails.payment_type === "IN" ? "Received (Sale)" : "Paid (Purchase)"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Reference</p>
-                  <p className="font-mono font-medium text-indigo-600">
-                    {selectedPaymentDetails.payment_type === "IN"
-                      ? selectedPaymentDetails.sale_invoice
-                      : selectedPaymentDetails.purchase_po}
-                  </p>
-                </div>
-              </div>
-
-              {/* Payment Method Details */}
-              <div className="bg-gray-50 p-3 rounded border border-gray-200">
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">Payment Method</p>
-                <p className="font-semibold">{selectedPaymentDetails.payment_method}</p>
-
-                {selectedPaymentDetails.payment_method === "Bank" && (
-                  <div className="grid grid-cols-2 gap-2 mt-2 text-sm border-t border-gray-200 pt-2">
-                    <div>
-                      <span className="text-gray-500 text-[10px] uppercase">Bank</span>
-                      <p className="font-medium">{selectedPaymentDetails.bank_name}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 text-[10px] uppercase">A/C Name</span>
-                      <p className="font-medium">{selectedPaymentDetails.bank_account_name}</p>
-                    </div>
-                    <div>
-                      <span className="text-gray-500 text-[10px] uppercase">A/C No</span>
-                      <p className="font-mono">{selectedPaymentDetails.bank_account_number}</p>
-                    </div>
-                    {selectedPaymentDetails.bank_branch_name && (
-                      <div>
-                        <span className="text-gray-500 text-[10px] uppercase">Branch</span>
-                        <p>{selectedPaymentDetails.bank_branch_name}</p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {["Bkash", "Nagad", "Rocket"].includes(selectedPaymentDetails.payment_method) && (
-                  <div className="mt-2 border-t border-gray-200 pt-2">
-                    <span className="text-gray-500 text-[10px] uppercase">Mobile Number</span>
-                    <p className="font-mono font-bold">{selectedPaymentDetails.mfs_mobile_number}</p>
-                  </div>
-                )}
-
-                {selectedPaymentDetails.transaction_id && (
-                  <div className="mt-2 border-t border-gray-200 pt-2">
-                    <span className="text-gray-500 text-[10px] uppercase">Transaction ID</span>
-                    <p className="font-mono">{selectedPaymentDetails.transaction_id}</p>
-                  </div>
-                )}
-
-                {selectedPaymentDetails.payment_method === "Cash" && (
-                  <div className="mt-2 text-gray-500 italic">Hand Cash</div>
-                )}
-              </div>
-
-              {selectedPaymentDetails.handled_by_name && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Processed By</p>
-                  <p className="font-medium">{selectedPaymentDetails.handled_by_name}</p>
-                </div>
-              )}
-
-              {selectedPaymentDetails.remarks && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">Remarks</p>
-                  <div className="bg-yellow-50 p-2 rounded border border-yellow-200 text-yellow-800">
-                    {selectedPaymentDetails.remarks}
-                  </div>
-                </div>
-              )}
-
-              {/* --- NEW: Products Table --- */}
-              <div>
-                <h3 className="text-[11px] font-bold text-gray-600 uppercase tracking-wider mb-1">
-                  {selectedPaymentDetails.payment_type === "IN" ? "Products Sold" : "Products Purchased"}
-                </h3>
-                {orderLoading ? (
-                  <div className="flex justify-center items-center p-4 text-gray-500">
-                    <FiLoader className="animate-spin mr-2" /> Loading products...
-                  </div>
-                ) : orderItems.length > 0 ? (
-                  <div className="border border-gray-300 overflow-hidden">
-                    <table className="w-full border-collapse text-sm">
-                      <thead>
-                        <tr className="bg-gray-800 text-white">
-                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-left">
-                            Product & Brand
-                          </th>
-                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-center">
-                            Qty
-                          </th>
-                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
-                            {selectedPaymentDetails.payment_type === "IN" ? "Unit Price" : "Unit Cost"}
-                          </th>
-                          <th className="border border-gray-600 px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-right">
-                            Total
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {orderItems.map((item, idx) => (
-                          <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                            <td className="border border-gray-300 px-2 py-1">
-                              <div className="text-xs font-medium text-gray-800">
-                                {item.product_name || "Product"}
-                              </div>
-                              <div className="text-[9px] text-gray-500 uppercase">
-                                {/* Brand might be nested; if not available, skip */}
-                                {item.brand_name || "—"}
-                              </div>
-                            </td>
-                            <td className="border border-gray-300 px-2 py-1 text-center text-xs">
-                              {item.quantity}
-                            </td>
-                            <td className="border border-gray-300 px-2 py-1 text-right font-mono text-xs">
-                              ৳ {parseFloat(item.unit_price_bdt || item.unit_cost_bdt || 0).toFixed(2)}
-                            </td>
-                            <td className="border border-gray-300 px-2 py-1 text-right font-mono font-bold text-xs">
-                              ৳ {parseFloat(item.total_price_bdt || item.total_cost_bdt || 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <div className="text-center text-gray-400 text-sm py-2 border border-gray-200 rounded">
-                    No product details available for this transaction.
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-gray-50 border-t border-gray-300 px-4 py-2 flex justify-end shrink-0">
-              <button
-                onClick={closeModal}
-                className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 border border-gray-300"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
