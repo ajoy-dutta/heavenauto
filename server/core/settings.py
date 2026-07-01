@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'products',
     'purchase',
     'sale',
+    'draftSale',
     'stock',
     'brand',
     'supplier',

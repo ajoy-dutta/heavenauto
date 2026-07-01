@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
+import { useNavigate, useParams } from "react-router-dom"; // Added useParams
 import axiosInstance from "../../../api/axios";
 import {
   FiPlus,
@@ -12,13 +12,16 @@ import {
   FiSave,
   FiArrowLeft,
   FiSearch,
-  FiUpload, // added for import button
 } from "react-icons/fi";
 
-export default function AddSale() {
+export default function AddDraftSale() {
   const navigate = useNavigate();
+  const { id } = useParams(); // get draft ID from URL
+  const isEditing = !!id;
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [fetchingDraft, setFetchingDraft] = useState(isEditing);
 
   // --- CORE DATA STATES ---
   const [products, setProducts] = useState([]);
@@ -34,9 +37,8 @@ export default function AddSale() {
   // --- ORDER HEADER ---
   const [orderData, setOrderData] = useState({
     customer: "",
-    sold_by: "",
-    invoice_number: "",
-    payment_status: "Paid",
+    sold_by: null,
+    payment_status: "Unpaid",
     remarks: "",
   });
 
@@ -58,15 +60,9 @@ export default function AddSale() {
     town_village: "",
   });
 
-  // --- DRAFT IMPORT MODAL ---
-  const [showDraftModal, setShowDraftModal] = useState(false);
-  const [draftList, setDraftList] = useState([]);
-  const [loadingDrafts, setLoadingDrafts] = useState(false);
-
-  // Refs for dropdown outside click handling
   const dropdownRefs = useRef({});
 
-  // --- FETCH DATA ---
+  // --- FETCH INITIAL DATA (products, customers, etc.) ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -91,7 +87,57 @@ export default function AddSale() {
     fetchData();
   }, []);
 
-  // --- HELPERS ---
+  // --- FETCH DRAFT DATA FOR EDITING ---
+  useEffect(() => {
+    if (!isEditing) return;
+
+    const fetchDraft = async () => {
+      try {
+        const response = await axiosInstance.get(`draft-sale/draft-sales/${id}/`);
+        const draft = response.data;
+
+        // Populate order header
+        setOrderData({
+          customer: draft.customer || "",
+          sold_by: draft.sold_by || null,
+          payment_status: draft.payment_status || "Unpaid",
+          remarks: draft.remarks || "",
+        });
+
+        // Populate manual items
+        if (draft.items && draft.items.length > 0) {
+          const items = draft.items.map((item) => {
+            // Find product details to build search string
+            const product = products.find((p) => String(p.id) === String(item.product));
+            const partNumber = product?.part_number || "";
+            const productName = item.product_name || product?.product_name || product?.name || "";
+            const searchText = partNumber ? `${partNumber} - ${productName}` : productName;
+
+            return {
+              product: item.product,
+              unit_price_bdt: parseFloat(item.unit_price_bdt).toFixed(2),
+              quantity: item.quantity,
+              search: searchText,
+              showDropdown: false,
+            };
+          });
+          setManualItems(items);
+          // Add an empty row at the end if needed
+          setManualItems((prev) => [...prev, { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false }]);
+        }
+
+        setFetchingDraft(false);
+      } catch (err) {
+        console.error("Failed to fetch draft", err);
+        setError("Could not load draft for editing.");
+        setFetchingDraft(false);
+      }
+    };
+
+    fetchDraft();
+  }, [id, isEditing, products]); // products dependency to have product list ready
+
+  // --- HELPERS (unchanged) ---
   const getProductStock = (productId) => {
     const stockItem = stocks.find((s) => String(s.product) === String(productId));
     return stockItem ? stockItem.current_quantity ?? 0 : 0;
@@ -112,7 +158,7 @@ export default function AddSale() {
     setOrderData({ ...orderData, [e.target.name]: e.target.value });
   };
 
-  // --- MANUAL MODE ---
+  // --- MANUAL MODE (unchanged) ---
   const handleManualItemChange = (index, field, value) => {
     const newItems = [...manualItems];
     if (field === "search") {
@@ -121,29 +167,23 @@ export default function AddSale() {
       setManualItems(newItems);
       return;
     }
-
     if (field === "product") {
-      // Prevent selecting the same product twice
       const isDuplicate = manualItems.some(
         (item, i) => i !== index && String(item.product) === String(value)
       );
-
       if (isDuplicate) {
         alert("This product is already added to the list!");
         return;
       }
-
       const selectedProduct = products.find((p) => String(p.id) === String(value));
       if (selectedProduct) {
         newItems[index].product = value;
         newItems[index].unit_price_bdt = selectedProduct.retail_price_bdt || 0;
-        // Show part number + name after selection
         const partNum = selectedProduct.part_number || "";
         const name = selectedProduct.product_name || selectedProduct.name || "";
         newItems[index].search = partNum ? `${partNum} - ${name}` : name;
         newItems[index].showDropdown = false;
       }
-      // Auto‑add a new empty row if this is the last row
       if (index === newItems.length - 1) {
         newItems.push({ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false });
       }
@@ -161,18 +201,13 @@ export default function AddSale() {
     }
   };
 
-  // Filter products by search text (part_number, name, brand) and exclude already selected items
   const getFilteredProducts = (searchText) => {
     const lowerSearch = searchText.toLowerCase();
-    
-    // Get all product IDs that are already selected in manual rows
     const selectedProductIds = manualItems
       .map((item) => String(item.product))
       .filter((id) => id !== "");
-
     return products.filter((p) => {
-      if (selectedProductIds.includes(String(p.id))) return false; // Exclude already selected
-      
+      if (selectedProductIds.includes(String(p.id))) return false;
       const name = (p.product_name || p.name || "").toLowerCase();
       const brand = getBrandName(p.brand).toLowerCase();
       const part = (p.part_number || "").toLowerCase();
@@ -180,7 +215,6 @@ export default function AddSale() {
     });
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       let outside = true;
@@ -199,11 +233,10 @@ export default function AddSale() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- BRAND MODE ---
+  // --- BRAND MODE (unchanged) ---
   const handleBrandDropdownSelect = (e) => {
     const brandId = Number(e.target.value);
     if (!brandId) return;
-
     if (!selectedBrands.includes(brandId)) {
       toggleBrandSelection(brandId);
     }
@@ -226,7 +259,6 @@ export default function AddSale() {
       } else {
         const newBrands = [...prev, brandId];
         const productsToAdd = products.filter((p) => String(p.brand) === String(brandId));
-
         const newBatchItems = productsToAdd.map((p) => ({
           product: p.id,
           product_name: p.product_name || p.name,
@@ -235,9 +267,7 @@ export default function AddSale() {
           purchase_cost_bdt: p.purchase_cost_bdt || 0,
           unit_price_bdt: p.retail_price_bdt || "",
           quantity: "",
-          current_stock: getProductStock(p.id),
         }));
-
         setBrandItems((currentItems) => {
           const existingProductIds = currentItems.map((item) => String(item.product));
           const uniqueNewItems = newBatchItems.filter(
@@ -245,7 +275,6 @@ export default function AddSale() {
           );
           return [...currentItems, ...uniqueNewItems];
         });
-
         return newBrands;
       }
     });
@@ -266,17 +295,14 @@ export default function AddSale() {
     setSelectedBrands([]);
   };
 
-  // --- CREATE CUSTOMER ---
+  // --- CREATE CUSTOMER (unchanged) ---
   const handleCreateCustomer = async (e) => {
     e.preventDefault();
     setCustomerLoading(true);
-
     const customerPayload = { ...newCustomerData, customer_type: "Retail" };
-
     try {
       const response = await axiosInstance.post("person/customers/", customerPayload);
       const newlyCreatedCustomer = response.data;
-
       setCustomers([...customers, newlyCreatedCustomer]);
       setOrderData({ ...orderData, customer: newlyCreatedCustomer.id });
       setIsCustomerModalOpen(false);
@@ -296,70 +322,19 @@ export default function AddSale() {
     }
   };
 
-  // --- DRAFT IMPORT FUNCTIONS ---
-  const fetchDrafts = async () => {
-    setLoadingDrafts(true);
-    try {
-      const res = await axiosInstance.get("draft-sale/draft-sales/");
-      setDraftList(res.data.results || res.data);
-    } catch (err) {
-      console.error(err);
-      alert("Failed to load drafts.");
-    } finally {
-      setLoadingDrafts(false);
-    }
-  };
-
-  const importDraft = (draft) => {
-    // Set customer
-    setOrderData((prev) => ({
-      ...prev,
-      customer: draft.customer,
-      remarks: draft.remarks || "",
-    }));
-
-    // Build manual items from draft items
-    const items = draft.items.map((item) => {
-      const product = products.find((p) => String(p.id) === String(item.product));
-      const partNumber = product?.part_number || "";
-      const productName = item.product_name || product?.product_name || product?.name || "";
-      const searchText = partNumber ? `${partNumber} - ${productName}` : productName;
-      return {
-        product: item.product,
-        unit_price_bdt: parseFloat(item.unit_price_bdt).toFixed(2),
-        quantity: item.quantity,
-        search: searchText,
-        showDropdown: false,
-      };
-    });
-    // Add an empty row at the end
-    items.push({ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false });
-    setManualItems(items);
-
-    // Close modal
-    setShowDraftModal(false);
-  };
-
   // --- CALCULATIONS ---
   const activeItems = entryMode === "manual" ? manualItems : brandItems;
-
   const grandTotal = activeItems.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.unit_price_bdt) || 0;
     return sum + qty * price;
   }, 0);
 
-  // --- SUBMIT ---
+  // --- SUBMIT (Create or Update) ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    if (!orderData.sold_by) {
-      setError("Please select the Employee making this sale.");
-      setLoading(false);
-      return;
-    }
 
     let itemsToSubmit = [];
     if (entryMode === "manual") {
@@ -379,9 +354,10 @@ export default function AddSale() {
     }
 
     const payload = {
-      ...orderData,
       customer: orderData.customer ? parseInt(orderData.customer) : null,
-      sold_by: parseInt(orderData.sold_by),
+      sold_by: null,
+      payment_status: "Unpaid",
+      remarks: orderData.remarks || "",
       items: itemsToSubmit.map((item) => ({
         product: item.product,
         quantity: parseInt(item.quantity, 10),
@@ -390,14 +366,29 @@ export default function AddSale() {
     };
 
     try {
-      await axiosInstance.post("sale/sales/", payload);
-      navigate("/dashboard/payments");
+      if (isEditing) {
+        // Update existing draft
+        await axiosInstance.put(`draft-sale/draft-sales/${id}/`, payload);
+      } else {
+        // Create new draft
+        await axiosInstance.post("draft-sale/draft-sales/", payload);
+      }
+      navigate("../draftlist");
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.detail || "Failed to process sale. Check stock levels and inputs.");
+      setError(err.response?.data?.detail || "Failed to save draft. Check inputs.");
       setLoading(false);
     }
   };
+
+  // --- RENDER ---
+  if (fetchingDraft) {
+    return (
+      <div className="max-w-7xl mx-auto p-3 bg-gray-50 min-h-screen flex justify-center items-center">
+        <p className="text-gray-500">Loading draft...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-7xl mx-auto p-3 bg-gray-50 min-h-screen">
@@ -411,23 +402,12 @@ export default function AddSale() {
             <FiArrowLeft size={18} />
           </button>
           <h1 className="text-xl font-bold flex items-center gap-2">
-            <FiShoppingCart className="text-green-600" /> New Sale Order
+            <FiShoppingCart className="text-blue-600" /> {isEditing ? "Edit Draft Sale" : "New Draft Sale"}
           </h1>
-          {/* Import Draft Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setShowDraftModal(true);
-              fetchDrafts();
-            }}
-            className="ml-2 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded border border-blue-700 transition"
-          >
-            <FiUpload size={14} /> Import Draft
-          </button>
         </div>
         <div className="text-right">
           <span className="text-[10px] text-gray-500 uppercase tracking-wider">Total Value</span>
-          <div className="text-xl font-bold text-green-600">৳ {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
+          <div className="text-xl font-bold text-blue-600">৳ {grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</div>
         </div>
       </div>
 
@@ -438,8 +418,8 @@ export default function AddSale() {
       )}
 
       <form onSubmit={handleSubmit} className="bg-white border border-gray-300 overflow-hidden">
-        {/* --- ORDER HEADER (Compact Grid) --- */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 p-2 bg-gray-50 border-b border-gray-300">
+        {/* --- ORDER HEADER (Customer + Remarks) --- */}
+        <div className="p-2 bg-gray-50 border-b border-gray-300 grid grid-cols-1 sm:grid-cols-2 gap-2">
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Customer
@@ -448,7 +428,7 @@ export default function AddSale() {
               name="customer"
               value={orderData.customer}
               onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
             >
               <option value=""> Select Customer </option>
               {customers.map((c) => (
@@ -463,86 +443,52 @@ export default function AddSale() {
           </div>
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
-              Sold By (Employee) *
-            </label>
-            <select
-              name="sold_by"
-              required
-              value={orderData.sold_by}
-              onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
-            >
-              <option value="">-- Select Employee --</option>
-              {employees.map((e) => {
-                const displayName = e.first_name
-                  ? `${e.first_name} ${e.last_name || ""}`.trim()
-                  : e.full_name || e.name || e.employee_id;
-                return (
-                  <option key={e.id} value={e.id}>
-                    {displayName} ({e.employee_id})
-                  </option>
-                );
-              })}
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
-              Payment Status
-            </label>
-            <select
-              name="payment_status"
-              value={orderData.payment_status}
-              onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
-            >
-              <option value="Paid">Paid</option>
-              <option value="Unpaid">Unpaid</option>
-              <option value="Partial">Partial</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Remarks
             </label>
             <input
               type="text"
               name="remarks"
-              value={orderData.remarks}
+              value={orderData.remarks || ""}
               onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
+              placeholder="Optional notes"
+              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
             />
           </div>
         </div>
 
-        {/* --- ENTRY MODE TOGGLE --- */}
+        {/* --- ENTRY MODE TOGGLE (disabled when editing) --- */}
         <div className="bg-gray-50 border-b border-gray-300 px-3 py-1.5 flex gap-2">
           <button
             type="button"
             onClick={() => setEntryMode("manual")}
+            disabled={isEditing}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded border transition ${
               entryMode === "manual"
-                ? "bg-green-100 text-green-800 border-green-300"
+                ? "bg-blue-100 text-blue-800 border-blue-300"
                 : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100"
-            }`}
+            } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <FiEdit2 size={14} /> Manual
           </button>
           <button
             type="button"
             onClick={() => setEntryMode("brand")}
+            disabled={isEditing}
             className={`flex items-center gap-1.5 px-3 py-1 text-xs font-semibold rounded border transition ${
               entryMode === "brand"
-                ? "bg-green-100 text-green-800 border-green-300"
+                ? "bg-blue-100 text-blue-800 border-blue-300"
                 : "bg-white text-gray-600 border-gray-300 hover:bg-gray-100"
-            }`}
+            } ${isEditing ? "opacity-50 cursor-not-allowed" : ""}`}
           >
             <FiLayers size={14} /> Batch by Brand
           </button>
+          {isEditing && <span className="text-xs text-gray-500 ml-2">(Brand mode disabled for editing)</span>}
         </div>
 
-        {/* --- BRAND SELECTOR (only in brand mode) --- */}
-        {entryMode === "brand" && (
-          <div className="bg-green-50/50 border-b border-gray-300 px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
+        {/* --- BRAND SELECTOR (hidden when editing) --- */}
+        {!isEditing && entryMode === "brand" && (
+          <div className="bg-blue-50/50 border-b border-gray-300 px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
+            {/* same as before */}
             <div className="flex-1 max-w-sm">
               <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
                 Add Brands
@@ -550,7 +496,7 @@ export default function AddSale() {
               <select
                 onChange={handleBrandDropdownSelect}
                 defaultValue=""
-                className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 outline-none"
+                className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 outline-none"
               >
                 <option value="" disabled>-- Choose a Brand --</option>
                 {brands
@@ -568,13 +514,13 @@ export default function AddSale() {
                     return b ? (
                       <span
                         key={id}
-                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 text-[10px] font-bold rounded border border-green-200"
+                        className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded border border-blue-200"
                       >
                         {b.name}
                         <button
                           type="button"
                           onClick={() => toggleBrandSelection(id)}
-                          className="text-green-600 hover:text-green-900 bg-white rounded-full p-0.5"
+                          className="text-blue-600 hover:text-blue-900 bg-white rounded-full p-0.5"
                         >
                           <FiX size={12} />
                         </button>
@@ -596,7 +542,7 @@ export default function AddSale() {
           </div>
         )}
 
-        {/* --- ITEMS TABLE --- */}
+        {/* --- ITEMS TABLE (no stock column) --- */}
         <div className="overflow-x-auto overflow-y-visible pb-24">
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -604,9 +550,6 @@ export default function AddSale() {
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">#</th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
                   Product & Brand
-                </th>
-                <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
-                  Stock
                 </th>
                 <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
                   Purch. Cost
@@ -626,9 +569,10 @@ export default function AddSale() {
               </tr>
             </thead>
             <tbody>
-              {entryMode === "brand" &&
+              {entryMode === "brand" && !isEditing && // only show brand items when not editing
                 brandItems.map((item, index) => (
                   <tr key={item.product} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                    {/* same as before */}
                     <td className="border border-gray-300 px-2 py-1.5 text-center text-xs text-gray-500">{index + 1}</td>
                     <td className="border border-gray-300 px-2 py-1.5">
                       <div className="font-medium text-gray-800 text-xs">
@@ -636,17 +580,6 @@ export default function AddSale() {
                         {item.product_name}
                       </div>
                       <div className="text-[9px] text-gray-500 uppercase">{item.brand_name}</div>
-                    </td>
-                    <td className="border border-gray-300 px-2 py-1.5 text-center">
-                      <span
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                          item.current_stock <= 5
-                            ? "bg-red-100 text-red-600"
-                            : "bg-gray-100 text-gray-700"
-                        }`}
-                      >
-                        {item.current_stock}
-                      </span>
                     </td>
                     <td className="border border-gray-300 px-2 py-1.5 text-center font-mono text-gray-500 text-xs">
                       {parseFloat(item.purchase_cost_bdt).toFixed(2)}
@@ -661,7 +594,7 @@ export default function AddSale() {
                         onChange={(e) =>
                           handleBrandItemChange(index, "unit_price_bdt", e.target.value)
                         }
-                        className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none font-semibold text-green-700"
+                        className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none font-semibold text-blue-700"
                       />
                     </td>
                     <td className="border border-gray-300 px-2 py-1.5">
@@ -673,7 +606,7 @@ export default function AddSale() {
                         onChange={(e) =>
                           handleBrandItemChange(index, "quantity", e.target.value)
                         }
-                        className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none"
+                        className="w-full bg-white border border-gray-300 rounded p-0.5 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none"
                       />
                     </td>
                     <td className="border border-gray-300 px-2 py-1.5 text-right font-mono font-bold text-gray-700 text-xs">
@@ -700,7 +633,6 @@ export default function AddSale() {
                     (p) => String(p.id) === String(item.product)
                   );
                   const manualBrandName = selectedProd ? getBrandName(selectedProd.brand) : "";
-                  const currentStock = selectedProd ? getProductStock(selectedProd.id) : "-";
                   const purchaseCost = selectedProd
                     ? parseFloat(selectedProd.purchase_cost_bdt).toFixed(2)
                     : "-";
@@ -713,7 +645,7 @@ export default function AddSale() {
                       <td className="border border-gray-300 px-2 py-3 text-center text-xs text-gray-500">{index + 1}</td>
                       <td className={`border border-gray-300 px-2 py-3 overflow-visible ${item.showDropdown ? 'relative z-50' : 'relative z-10'}`}>
                         <div ref={(el) => (dropdownRefs.current[index] = el)}>
-                          <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-green-500">
+                          <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-blue-500">
                             <FiSearch className="ml-1.5 text-gray-400" size={12} />
                             <input
                               type="text"
@@ -754,7 +686,7 @@ export default function AddSale() {
                                   {filteredProducts.map((p) => (
                                     <li
                                       key={p.id}
-                                      className="px-2 py-1 hover:bg-green-100 cursor-pointer text-xs flex justify-between items-center"
+                                      className="px-2 py-1 hover:bg-blue-100 cursor-pointer text-xs flex justify-between items-center"
                                       onMouseDown={(e) => {
                                         e.preventDefault();
                                         handleManualItemChange(index, "product", p.id);
@@ -788,17 +720,6 @@ export default function AddSale() {
                           </div>
                         )}
                       </td>
-                      <td className="border border-gray-300 px-2 py-3 text-center">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            currentStock !== "-" && currentStock <= 5
-                              ? "bg-red-100 text-red-600"
-                              : "text-gray-600"
-                          }`}
-                        >
-                          {currentStock}
-                        </span>
-                      </td>
                       <td className="border border-gray-300 px-2 py-3 text-center font-mono text-gray-500 text-xs">
                         {purchaseCost}
                       </td>
@@ -813,7 +734,7 @@ export default function AddSale() {
                           onChange={(e) =>
                             handleManualItemChange(index, "unit_price_bdt", e.target.value)
                           }
-                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none font-semibold text-green-700"
+                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none font-semibold text-blue-700"
                         />
                       </td>
                       <td className="border border-gray-300 px-2 py-3">
@@ -826,7 +747,7 @@ export default function AddSale() {
                           onChange={(e) =>
                             handleManualItemChange(index, "quantity", e.target.value)
                           }
-                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-green-500 outline-none"
+                          className="w-full bg-white border border-gray-300 rounded p-1 text-xs text-center focus:ring-1 focus:ring-blue-500 outline-none"
                         />
                       </td>
                       <td className="border border-gray-300 px-2 py-3 text-right font-mono font-bold text-gray-700 text-xs">
@@ -849,9 +770,9 @@ export default function AddSale() {
                   );
                 })}
 
-              {entryMode === "brand" && brandItems.length === 0 && (
+              {entryMode === "brand" && brandItems.length === 0 && !isEditing && (
                 <tr>
-                  <td colSpan="8" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
+                  <td colSpan="7" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
                     Use the brand selector above to load products.
                   </td>
                 </tr>
@@ -868,7 +789,7 @@ export default function AddSale() {
               onClick={() =>
                 setManualItems([...manualItems, { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false }])
               }
-              className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-semibold"
+              className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 font-semibold"
             >
               <FiPlus size={14} /> Add Row
             </button>
@@ -879,7 +800,7 @@ export default function AddSale() {
         <div className="p-3 bg-gray-50 border-t border-gray-300 flex flex-col sm:flex-row justify-end gap-2">
           <button
             type="button"
-            onClick={() => navigate("/dashboard/sales")}
+            onClick={() => navigate("/dashboard/sales/draftlist")}
             className="px-4 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 transition border border-gray-300"
           >
             Cancel
@@ -888,10 +809,10 @@ export default function AddSale() {
             type="submit"
             disabled={loading}
             className={`px-6 py-1.5 rounded text-sm font-bold text-white transition ${
-              loading ? "bg-green-400 cursor-not-allowed" : "bg-green-600 hover:bg-green-700"
+              loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
             }`}
           >
-            {loading ? "Processing..." : "Complete Sale"}
+            {loading ? "Processing..." : isEditing ? "Update Draft" : "Save Draft"}
           </button>
         </div>
       </form>
@@ -902,7 +823,7 @@ export default function AddSale() {
           <div className="bg-white border border-gray-300 w-full max-w-md rounded-lg overflow-hidden max-h-[90vh] flex flex-col">
             <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center">
               <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                <FiUserPlus className="text-green-600" /> Quick Add Customer
+                <FiUserPlus className="text-blue-600" /> Quick Add Customer
               </h2>
               <button
                 onClick={() => setIsCustomerModalOpen(false)}
@@ -912,6 +833,7 @@ export default function AddSale() {
               </button>
             </div>
             <form onSubmit={handleCreateCustomer} className="overflow-y-auto flex-1 p-4 space-y-3">
+              {/* same as before */}
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
@@ -923,7 +845,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, shop_name: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="e.g. Dhaka Motors"
                   />
                 </div>
@@ -938,7 +860,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, proprietor_name: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="Owner's Name"
                   />
                 </div>
@@ -953,7 +875,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, mobile1: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="01XXXXXXXXX"
                   />
                 </div>
@@ -971,7 +893,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, division: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="e.g. Khulna"
                   />
                 </div>
@@ -986,7 +908,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, district: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="e.g. Jashore"
                   />
                 </div>
@@ -1001,7 +923,7 @@ export default function AddSale() {
                     onChange={(e) =>
                       setNewCustomerData({ ...newCustomerData, town_village: e.target.value })
                     }
-                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-green-500 outline-none"
+                    className="w-full bg-white border border-gray-300 rounded p-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                     placeholder="e.g. Chougacha"
                   />
                 </div>
@@ -1019,105 +941,13 @@ export default function AddSale() {
                   type="submit"
                   disabled={customerLoading}
                   className={`px-4 py-1.5 rounded text-sm font-bold text-white transition flex items-center gap-2 ${
-                    customerLoading ? "bg-green-400" : "bg-green-600 hover:bg-green-700"
+                    customerLoading ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
                   }`}
                 >
                   <FiSave /> {customerLoading ? "Saving..." : "Save & Select"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- DRAFT IMPORT MODAL --- */}
-      {showDraftModal && (
-        <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-3">
-          <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-lg">
-            <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center shrink-0">
-              <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                <FiUpload className="text-blue-600" /> Import from Draft
-              </h2>
-              <button
-                onClick={() => setShowDraftModal(false)}
-                className="text-gray-500 hover:text-red-500"
-              >
-                <FiX size={20} />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 p-4">
-              {loadingDrafts ? (
-                <p className="text-center text-gray-500">Loading drafts...</p>
-              ) : draftList.length === 0 ? (
-                <p className="text-center text-gray-400">No drafts available.</p>
-              ) : (
-                <div className="border border-gray-300 overflow-hidden">
-                  <table className="w-full border-collapse text-sm">
-                    <thead>
-                      <tr className="bg-gray-800 text-white">
-                        <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
-                          Invoice
-                        </th>
-                        <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
-                          Customer
-                        </th>
-                        <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-left">
-                          Date
-                        </th>
-                        <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-right">
-                          Total
-                        </th>
-                        <th className="border border-gray-600 px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-center">
-                          Action
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {draftList.map((draft, idx) => (
-                        <tr key={draft.id} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                          <td className="border border-gray-300 px-2 py-1.5 text-xs font-medium">
-                            {draft.invoice_number}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-xs">
-                            {draft.customer_name || "Walk-in"}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-xs">
-                            {new Date(draft.sale_date).toLocaleDateString("en-BD", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-right font-mono text-xs font-bold">
-                            ৳ {parseFloat(draft.total_amount).toFixed(2)}
-                          </td>
-                          <td className="border border-gray-300 px-2 py-1.5 text-center">
-                            <button
-                              type="button"
-                              onClick={() => importDraft(draft)}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs font-semibold transition"
-                            >
-                              Import
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 border-t border-gray-300 px-4 py-2 flex justify-end shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowDraftModal(false)}
-                className="px-3 py-1.5 rounded text-sm font-medium text-gray-600 hover:bg-gray-200 border border-gray-300"
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}

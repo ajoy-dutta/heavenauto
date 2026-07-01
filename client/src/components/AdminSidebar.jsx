@@ -49,6 +49,9 @@ export default function AdminSidebar() {
       subItems: [
         { to: "/dashboard/sales/add", label: "New Sale", icon: FiPlus },
         { to: "/dashboard/sales", label: "Sale History", icon: FiList },
+        // 🔽 Added Draft links
+        { to: "/dashboard/sales/draft", label: "New Draft", icon: FiPlus },
+        { to: "/dashboard/draftlist", label: "Draft List", icon: FiList },
       ]
     },
     { 
@@ -110,6 +113,7 @@ export default function AdminSidebar() {
     },
   ];
 
+  // Auto-open dropdown if a sub-item is active
   useEffect(() => {
     navItems.forEach(item => {
       if (item.type === "dropdown" && item.subItems) {

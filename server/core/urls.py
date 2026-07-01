@@ -20,13 +20,15 @@ def master_api_root(request):
         "2. Products API": request.build_absolute_uri('/api/products/'),
         "3. Purchase API": request.build_absolute_uri('/api/purchase/'),
         "4. Sale API": request.build_absolute_uri('/api/sale/'),
-        "5. Stock / Inventory API": request.build_absolute_uri('/api/stock/'),
-        "6. Brand API": request.build_absolute_uri('/api/brand/'),
-        "7. Supplier API": request.build_absolute_uri('/api/supplier/'),
-        "8. Payment API": request.build_absolute_uri('/api/payment/'),
-        "9. Capital API": request.build_absolute_uri('/api/capital/'),
-        "10. Expense API": request.build_absolute_uri('/api/expense/'),
-        "11. Account API": request.build_absolute_uri('/api/account/'),
+        "5. Draft Sale API": request.build_absolute_uri('/api/draft-sale/'),
+        "6. Stock / Inventory API": request.build_absolute_uri('/api/stock/'),
+        "7. Brand API": request.build_absolute_uri('/api/brand/'),
+        "8. Supplier API": request.build_absolute_uri('/api/supplier/'),
+        "9. Payment API": request.build_absolute_uri('/api/payment/'),
+        "10. Capital API": request.build_absolute_uri('/api/capital/'),
+        "11. Expense API": request.build_absolute_uri('/api/expense/'),
+        "12. Account API": request.build_absolute_uri('/api/account/'),
+        
     })
 
 urlpatterns = [
@@ -49,6 +51,7 @@ urlpatterns = [
     path('api/capital/', include('capital.urls')),
     path('api/expense/', include('expense.urls')),
     path('api/account/', include('account.urls')),
+    path('api/draft-sale/', include('draftSale.urls')),
 
     # Token Authentication
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
