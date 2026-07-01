@@ -23,6 +23,7 @@ import SaleHistory from './pages/admin/sales/SaleHistory';
 import AddSale from './pages/admin/sales/AddSale';
 import AddDraftSale from './pages/admin/sales/AddDraftSale';
 import DraftSaleList from './pages/admin/sales/DraftSaleList';
+import ViewDraft from './pages/admin/sales/ViewDraft';
 import Payments from './pages/admin/payment/Payments';
 import PaymentHistory from './pages/admin/payment/PaymentHistory';
 import ViewPaymentdetails from './pages/admin/payment/ViewPaymentdetails'; // <-- ADDED: Imported new view page
@@ -80,7 +81,8 @@ export const router = createBrowserRouter([
       { path: "sales/add", element: <AddSale /> },
       { path: "sales/draft", element: <AddDraftSale /> },
       { path: "sales/draft/:id", element: <AddDraftSale /> },
-      { path: "draftlist", element: <DraftSaleList /> },
+      { path: "sales/draftlist", element: <DraftSaleList /> },
+      { path: "sales/draft/:id/view", element: <ViewDraft /> },
       // Finance Routes
       { path: "finance/dashboard", element: <FinancialDashboard /> },
       { path: "finance/chart-of-accounts", element: <ChartOfAccounts /> },

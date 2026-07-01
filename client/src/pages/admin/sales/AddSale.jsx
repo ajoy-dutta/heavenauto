@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import {
@@ -12,7 +12,7 @@ import {
   FiSave,
   FiArrowLeft,
   FiSearch,
-  FiUpload, // added for import button
+  FiUpload,
 } from "react-icons/fi";
 
 export default function AddSale() {
@@ -39,6 +39,14 @@ export default function AddSale() {
     payment_status: "Paid",
     remarks: "",
   });
+
+  // --- Customer search/autocomplete ---
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [selectedCustomerName, setSelectedCustomerName] = useState("");
+  const [selectedCustomerDisplayName, setSelectedCustomerDisplayName] = useState("");
+  const customerDropdownRef = useRef(null);
 
   // --- ITEM STATES ---
   const [manualItems, setManualItems] = useState([
@@ -91,6 +99,69 @@ export default function AddSale() {
     fetchData();
   }, []);
 
+  // --- Debounced customer search ---
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (customerSearchTerm.trim() === selectedCustomerDisplayName) {
+        setCustomerOptions([]);
+        setIsCustomerDropdownOpen(false);
+        return;
+      }
+      if (customerSearchTerm.trim().length > 0) {
+        fetchCustomerOptions(customerSearchTerm.trim());
+      } else {
+        setCustomerOptions([]);
+        setIsCustomerDropdownOpen(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [customerSearchTerm, selectedCustomerDisplayName]);
+
+  const fetchCustomerOptions = async (search) => {
+    try {
+      const response = await axiosInstance.get("person/customers/", {
+        params: { search: search },
+      });
+      const results = response.data.results || response.data || [];
+      setCustomerOptions(results);
+      setIsCustomerDropdownOpen(results.length > 0);
+    } catch (err) {
+      console.error("Customer search failed", err);
+      setCustomerOptions([]);
+      setIsCustomerDropdownOpen(false);
+    }
+  };
+
+  const selectCustomer = (customer) => {
+    setOrderData({ ...orderData, customer: customer.id });
+    const displayName = customer.shop_name || customer.proprietor_name || customer.name || "Unknown";
+    setSelectedCustomerName(displayName);
+    setSelectedCustomerDisplayName(displayName);
+    setCustomerSearchTerm(displayName);
+    setCustomerOptions([]);
+    setIsCustomerDropdownOpen(false);
+  };
+
+  const clearCustomer = () => {
+    setOrderData({ ...orderData, customer: "" });
+    setSelectedCustomerName("");
+    setSelectedCustomerDisplayName("");
+    setCustomerSearchTerm("");
+    setCustomerOptions([]);
+    setIsCustomerDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target)) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // --- HELPERS ---
   const getProductStock = (productId) => {
     const stockItem = stocks.find((s) => String(s.product) === String(productId));
@@ -103,12 +174,7 @@ export default function AddSale() {
     return brand ? brand.name : "Unknown Brand";
   };
 
-  // --- HEADER HANDLERS ---
   const handleOrderChange = (e) => {
-    if (e.target.name === "customer" && e.target.value === "ADD_NEW") {
-      setIsCustomerModalOpen(true);
-      return;
-    }
     setOrderData({ ...orderData, [e.target.name]: e.target.value });
   };
 
@@ -121,29 +187,23 @@ export default function AddSale() {
       setManualItems(newItems);
       return;
     }
-
     if (field === "product") {
-      // Prevent selecting the same product twice
       const isDuplicate = manualItems.some(
         (item, i) => i !== index && String(item.product) === String(value)
       );
-
       if (isDuplicate) {
         alert("This product is already added to the list!");
         return;
       }
-
       const selectedProduct = products.find((p) => String(p.id) === String(value));
       if (selectedProduct) {
         newItems[index].product = value;
         newItems[index].unit_price_bdt = selectedProduct.retail_price_bdt || 0;
-        // Show part number + name after selection
         const partNum = selectedProduct.part_number || "";
         const name = selectedProduct.product_name || selectedProduct.name || "";
         newItems[index].search = partNum ? `${partNum} - ${name}` : name;
         newItems[index].showDropdown = false;
       }
-      // Auto‑add a new empty row if this is the last row
       if (index === newItems.length - 1) {
         newItems.push({ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false });
       }
@@ -161,18 +221,13 @@ export default function AddSale() {
     }
   };
 
-  // Filter products by search text (part_number, name, brand) and exclude already selected items
   const getFilteredProducts = (searchText) => {
     const lowerSearch = searchText.toLowerCase();
-    
-    // Get all product IDs that are already selected in manual rows
     const selectedProductIds = manualItems
       .map((item) => String(item.product))
       .filter((id) => id !== "");
-
     return products.filter((p) => {
-      if (selectedProductIds.includes(String(p.id))) return false; // Exclude already selected
-      
+      if (selectedProductIds.includes(String(p.id))) return false;
       const name = (p.product_name || p.name || "").toLowerCase();
       const brand = getBrandName(p.brand).toLowerCase();
       const part = (p.part_number || "").toLowerCase();
@@ -180,7 +235,6 @@ export default function AddSale() {
     });
   };
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       let outside = true;
@@ -203,7 +257,6 @@ export default function AddSale() {
   const handleBrandDropdownSelect = (e) => {
     const brandId = Number(e.target.value);
     if (!brandId) return;
-
     if (!selectedBrands.includes(brandId)) {
       toggleBrandSelection(brandId);
     }
@@ -226,7 +279,6 @@ export default function AddSale() {
       } else {
         const newBrands = [...prev, brandId];
         const productsToAdd = products.filter((p) => String(p.brand) === String(brandId));
-
         const newBatchItems = productsToAdd.map((p) => ({
           product: p.id,
           product_name: p.product_name || p.name,
@@ -237,7 +289,6 @@ export default function AddSale() {
           quantity: "",
           current_stock: getProductStock(p.id),
         }));
-
         setBrandItems((currentItems) => {
           const existingProductIds = currentItems.map((item) => String(item.product));
           const uniqueNewItems = newBatchItems.filter(
@@ -245,7 +296,6 @@ export default function AddSale() {
           );
           return [...currentItems, ...uniqueNewItems];
         });
-
         return newBrands;
       }
     });
@@ -270,15 +320,12 @@ export default function AddSale() {
   const handleCreateCustomer = async (e) => {
     e.preventDefault();
     setCustomerLoading(true);
-
     const customerPayload = { ...newCustomerData, customer_type: "Retail" };
-
     try {
       const response = await axiosInstance.post("person/customers/", customerPayload);
       const newlyCreatedCustomer = response.data;
-
-      setCustomers([...customers, newlyCreatedCustomer]);
-      setOrderData({ ...orderData, customer: newlyCreatedCustomer.id });
+      setCustomers((prev) => [...prev, newlyCreatedCustomer]);
+      selectCustomer(newlyCreatedCustomer);
       setIsCustomerModalOpen(false);
       setNewCustomerData({
         shop_name: "",
@@ -311,14 +358,31 @@ export default function AddSale() {
   };
 
   const importDraft = (draft) => {
-    // Set customer
-    setOrderData((prev) => ({
-      ...prev,
-      customer: draft.customer,
-      remarks: draft.remarks || "",
-    }));
+    if (draft.customer) {
+      const cust = customers.find((c) => String(c.id) === String(draft.customer));
+      if (cust) {
+        const displayName = cust.shop_name || cust.proprietor_name || cust.name || "Unknown";
+        setSelectedCustomerName(displayName);
+        setSelectedCustomerDisplayName(displayName);
+        setCustomerSearchTerm(displayName);
+      } else {
+        setSelectedCustomerName(`Customer #${draft.customer}`);
+        setSelectedCustomerDisplayName(`Customer #${draft.customer}`);
+        setCustomerSearchTerm(`Customer #${draft.customer}`);
+      }
+      setOrderData((prev) => ({
+        ...prev,
+        customer: draft.customer,
+        remarks: draft.remarks || "",
+      }));
+    } else {
+      setOrderData((prev) => ({
+        ...prev,
+        customer: "",
+        remarks: draft.remarks || "",
+      }));
+    }
 
-    // Build manual items from draft items
     const items = draft.items.map((item) => {
       const product = products.find((p) => String(p.id) === String(item.product));
       const partNumber = product?.part_number || "";
@@ -332,17 +396,13 @@ export default function AddSale() {
         showDropdown: false,
       };
     });
-    // Add an empty row at the end
     items.push({ product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false });
     setManualItems(items);
-
-    // Close modal
     setShowDraftModal(false);
   };
 
   // --- CALCULATIONS ---
   const activeItems = entryMode === "manual" ? manualItems : brandItems;
-
   const grandTotal = activeItems.reduce((sum, item) => {
     const qty = parseFloat(item.quantity) || 0;
     const price = parseFloat(item.unit_price_bdt) || 0;
@@ -413,7 +473,6 @@ export default function AddSale() {
           <h1 className="text-xl font-bold flex items-center gap-2">
             <FiShoppingCart className="text-green-600" /> New Sale Order
           </h1>
-          {/* Import Draft Button */}
           <button
             type="button"
             onClick={() => {
@@ -440,27 +499,89 @@ export default function AddSale() {
       <form onSubmit={handleSubmit} className="bg-white border border-gray-300 overflow-hidden">
         {/* --- ORDER HEADER (Compact Grid) --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 p-2 bg-gray-50 border-b border-gray-300">
-          <div>
+          {/* Customer combobox with always-visible Add New button */}
+          <div ref={customerDropdownRef} className="relative">
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Customer
             </label>
-            <select
-              name="customer"
-              value={orderData.customer}
-              onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-green-500 focus:border-green-500 outline-none"
-            >
-              <option value=""> Select Customer </option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.shop_name ? `${c.shop_name} (${c.proprietor_name})` : c.proprietor_name}
-                </option>
-              ))}
-              <option value="ADD_NEW" className="bg-blue-50 text-blue-700 font-bold">
-                + Add New Customer
-              </option>
-            </select>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 relative">
+                <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-green-500">
+                  <FiSearch className="ml-1.5 text-gray-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search by name, mobile or shop"
+                    value={customerSearchTerm}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setCustomerSearchTerm(newValue);
+                      if (selectedCustomerDisplayName && newValue !== selectedCustomerDisplayName) {
+                        clearCustomer();
+                      }
+                      if (newValue === "") {
+                        clearCustomer();
+                      }
+                    }}
+                    onFocus={() => {
+                      if (customerSearchTerm.trim().length > 0 && customerOptions.length > 0) {
+                        setIsCustomerDropdownOpen(true);
+                      }
+                    }}
+                    className="w-full bg-transparent p-1 text-sm text-gray-800 focus:outline-none"
+                    autoComplete="off"
+                  />
+                  {orderData.customer && (
+                    <button
+                      type="button"
+                      onClick={clearCustomer}
+                      className="mr-1 text-gray-400 hover:text-red-500"
+                    >
+                      <FiX size={14} />
+                    </button>
+                  )}
+                </div>
+                {isCustomerDropdownOpen && customerOptions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto z-50">
+                    <ul>
+                      {customerOptions.map((cust) => {
+                        const display = cust.shop_name || cust.proprietor_name || cust.name || "Unknown";
+                        return (
+                          <li
+                            key={cust.id}
+                            className="px-2 py-1.5 hover:bg-green-100 cursor-pointer text-sm flex justify-between items-center"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectCustomer(cust);
+                            }}
+                          >
+                            <span>{display}</span>
+                            <span className="text-[10px] text-gray-500">{cust.mobile1}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {/* Always-visible Add New Customer button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomerDropdownOpen(false);
+                  setIsCustomerModalOpen(true);
+                }}
+                className="flex-shrink-0 bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition flex items-center gap-1 border border-green-700"
+              >
+                <FiUserPlus size={14} /> Add New
+              </button>
+            </div>
+            {orderData.customer && (
+              <div className="mt-0.5 text-xs text-green-700 font-medium">
+                Selected: {selectedCustomerName}
+              </div>
+            )}
           </div>
+
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Sold By (Employee) *
@@ -514,7 +635,7 @@ export default function AddSale() {
           </div>
         </div>
 
-        {/* --- ENTRY MODE TOGGLE --- */}
+        {/* --- ENTRY MODE TOGGLE (unchanged) --- */}
         <div className="bg-gray-50 border-b border-gray-300 px-3 py-1.5 flex gap-2">
           <button
             type="button"
@@ -540,7 +661,7 @@ export default function AddSale() {
           </button>
         </div>
 
-        {/* --- BRAND SELECTOR (only in brand mode) --- */}
+        {/* --- BRAND SELECTOR (unchanged) --- */}
         {entryMode === "brand" && (
           <div className="bg-green-50/50 border-b border-gray-300 px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
             <div className="flex-1 max-w-sm">
@@ -596,7 +717,7 @@ export default function AddSale() {
           </div>
         )}
 
-        {/* --- ITEMS TABLE --- */}
+        {/* --- ITEMS TABLE (unchanged) --- */}
         <div className="overflow-x-auto overflow-y-visible pb-24">
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -1030,7 +1151,7 @@ export default function AddSale() {
         </div>
       )}
 
-      {/* --- DRAFT IMPORT MODAL --- */}
+      {/* --- DRAFT IMPORT MODAL (unchanged) --- */}
       {showDraftModal && (
         <div className="fixed inset-0 bg-black/60 flex justify-center items-center z-50 p-3">
           <div className="bg-white border border-gray-300 w-full max-w-3xl max-h-[90vh] flex flex-col rounded-lg">

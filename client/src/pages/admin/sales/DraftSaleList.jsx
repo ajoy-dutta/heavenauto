@@ -58,7 +58,9 @@ export default function DraftSaleList() {
   const getCustomerName = (id) => {
     if (!id) return "Walk-in Customer";
     const cust = customers.find((c) => String(c.id) === String(id));
-    return cust ? cust.shop_name || cust.proprietor_name || cust.name : "Walk-in Customer";
+    return cust
+      ? cust.shop_name || cust.proprietor_name || cust.name
+      : "Walk-in Customer";
   };
 
   const getProductPartNumber = (item) => {
@@ -76,7 +78,7 @@ export default function DraftSaleList() {
     const latest =
       drafts.length > 0
         ? drafts.reduce((latest, s) =>
-            new Date(s.sale_date) > new Date(latest.sale_date) ? s : latest
+            new Date(s.sale_date) > new Date(latest.sale_date) ? s : latest,
           ).sale_date
         : null;
     return { count, latest };
@@ -86,7 +88,7 @@ export default function DraftSaleList() {
   const handleDelete = async (id) => {
     if (
       window.confirm(
-        "Are you sure you want to permanently delete this Draft Sale? This action cannot be undone."
+        "Are you sure you want to permanently delete this Draft Sale? This action cannot be undone.",
       )
     ) {
       try {
@@ -101,7 +103,12 @@ export default function DraftSaleList() {
   // --- FILTER ---
   const filteredDrafts = drafts.filter((s) => {
     const custName = getCustomerName(s.customer).toLowerCase();
-    const productNames = s.items ? s.items.map((i) => i.product_name).join(" ").toLowerCase() : "";
+    const productNames = s.items
+      ? s.items
+          .map((i) => i.product_name)
+          .join(" ")
+          .toLowerCase()
+      : "";
     const search = searchTerm.toLowerCase();
 
     return (
@@ -173,7 +180,9 @@ export default function DraftSaleList() {
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-gray-400 text-sm">Loading records...</div>
+          <div className="p-8 text-center text-gray-400 text-sm">
+            Loading records...
+          </div>
         ) : error ? (
           <div className="p-8 text-center text-red-500 text-sm">{error}</div>
         ) : (
@@ -204,7 +213,11 @@ export default function DraftSaleList() {
                     const displayTotal =
                       parseFloat(draft.total_amount) > 0
                         ? parseFloat(draft.total_amount)
-                        : draft.items?.reduce((sum, i) => sum + parseFloat(i.total_price_bdt || 0), 0);
+                        : draft.items?.reduce(
+                            (sum, i) =>
+                              sum + parseFloat(i.total_price_bdt || 0),
+                            0,
+                          );
 
                     return (
                       <tr
@@ -216,11 +229,14 @@ export default function DraftSaleList() {
                             {draft.invoice_number}
                           </div>
                           <div className="text-[10px] text-gray-500">
-                            {new Date(draft.sale_date).toLocaleDateString("en-BD", {
-                              day: "2-digit",
-                              month: "short",
-                              year: "numeric",
-                            })}
+                            {new Date(draft.sale_date).toLocaleDateString(
+                              "en-BD",
+                              {
+                                day: "2-digit",
+                                month: "short",
+                                year: "numeric",
+                              },
+                            )}
                           </div>
                         </td>
                         <td className="border border-gray-300 px-2 py-1.5">
@@ -234,7 +250,9 @@ export default function DraftSaleList() {
                           </div>
                           <div
                             className="text-[10px] text-gray-500 truncate"
-                            title={draft.items?.map((i) => i.product_name).join(", ")}
+                            title={draft.items
+                              ?.map((i) => i.product_name)
+                              .join(", ")}
                           >
                             {draft.items?.map((i) => i.product_name).join(", ")}
                           </div>
@@ -246,11 +264,15 @@ export default function DraftSaleList() {
                           <div className="flex justify-center items-center gap-1">
                             <button
                               onClick={() => {
-                                setSelectedDraft(draft);
-                                setIsViewModalOpen(true);
+                                navigate(
+                                  `/dashboard/sales/draft/${draft.id}/view`,
+                                  {
+                                    state: { draftData: draft },
+                                  },
+                                );
                               }}
                               className="text-blue-600 hover:text-blue-800 transition p-0.5"
-                              title="View Products"
+                              title="View Full Details"
                             >
                               <FiEye size={15} />
                             </button>
@@ -279,7 +301,10 @@ export default function DraftSaleList() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan="5" className="border border-gray-300 px-3 py-6 text-center text-gray-400 text-sm">
+                    <td
+                      colSpan="5"
+                      className="border border-gray-300 px-3 py-6 text-center text-gray-400 text-sm"
+                    >
                       No draft sales found.
                     </td>
                   </tr>
@@ -298,7 +323,8 @@ export default function DraftSaleList() {
             <div className="bg-gray-100 border-b border-gray-300 px-4 py-2 flex justify-between items-center shrink-0">
               <div>
                 <h2 className="font-bold text-gray-800 flex items-center gap-2">
-                  <FiShoppingCart className="text-blue-600" /> {selectedDraft.invoice_number}
+                  <FiShoppingCart className="text-blue-600" />{" "}
+                  {selectedDraft.invoice_number}
                 </h2>
                 <p className="text-[10px] text-gray-500">
                   Customer: {getCustomerName(selectedDraft.customer)}
@@ -342,7 +368,10 @@ export default function DraftSaleList() {
                     {selectedDraft.items?.map((item, idx) => {
                       const partNumber = getProductPartNumber(item);
                       return (
-                        <tr key={idx} className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}>
+                        <tr
+                          key={idx}
+                          className={idx % 2 === 0 ? "bg-white" : "bg-gray-50"}
+                        >
                           <td className="border border-gray-300 px-2 py-1 text-center text-xs">
                             {idx + 1}
                           </td>
@@ -366,9 +395,13 @@ export default function DraftSaleList() {
                         </tr>
                       );
                     })}
-                    {(!selectedDraft.items || selectedDraft.items.length === 0) && (
+                    {(!selectedDraft.items ||
+                      selectedDraft.items.length === 0) && (
                       <tr>
-                        <td colSpan="5" className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm">
+                        <td
+                          colSpan="5"
+                          className="border border-gray-300 px-3 py-4 text-center text-gray-400 text-sm"
+                        >
                           No products in this draft.
                         </td>
                       </tr>

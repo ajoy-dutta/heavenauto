@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { useNavigate, useParams } from "react-router-dom"; // Added useParams
+import { useNavigate, useParams } from "react-router-dom";
 import axiosInstance from "../../../api/axios";
 import {
   FiPlus,
@@ -16,7 +16,7 @@ import {
 
 export default function AddDraftSale() {
   const navigate = useNavigate();
-  const { id } = useParams(); // get draft ID from URL
+  const { id } = useParams();
   const isEditing = !!id;
 
   const [loading, setLoading] = useState(false);
@@ -42,6 +42,14 @@ export default function AddDraftSale() {
     remarks: "",
   });
 
+  // --- Customer search/autocomplete ---
+  const [customerSearchTerm, setCustomerSearchTerm] = useState("");
+  const [customerOptions, setCustomerOptions] = useState([]);
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [selectedCustomerName, setSelectedCustomerName] = useState("");
+  const [selectedCustomerDisplayName, setSelectedCustomerDisplayName] = useState("");
+  const customerDropdownRef = useRef(null);
+
   // --- ITEM STATES ---
   const [manualItems, setManualItems] = useState([
     { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false },
@@ -62,7 +70,7 @@ export default function AddDraftSale() {
 
   const dropdownRefs = useRef({});
 
-  // --- FETCH INITIAL DATA (products, customers, etc.) ---
+  // --- FETCH INITIAL DATA ---
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -96,7 +104,6 @@ export default function AddDraftSale() {
         const response = await axiosInstance.get(`draft-sale/draft-sales/${id}/`);
         const draft = response.data;
 
-        // Populate order header
         setOrderData({
           customer: draft.customer || "",
           sold_by: draft.sold_by || null,
@@ -104,10 +111,25 @@ export default function AddDraftSale() {
           remarks: draft.remarks || "",
         });
 
-        // Populate manual items
+        if (draft.customer) {
+          try {
+            const custResponse = await axiosInstance.get(`person/customers/${draft.customer}/`);
+            const cust = custResponse.data;
+            const name = cust.shop_name || cust.proprietor_name || cust.name || "Unknown";
+            setSelectedCustomerName(name);
+            setSelectedCustomerDisplayName(name);
+            setCustomerSearchTerm(name);
+          } catch (err) {
+            console.warn("Could not fetch customer name", err);
+            const fallback = "Customer #" + draft.customer;
+            setSelectedCustomerName(fallback);
+            setSelectedCustomerDisplayName(fallback);
+            setCustomerSearchTerm(fallback);
+          }
+        }
+
         if (draft.items && draft.items.length > 0) {
           const items = draft.items.map((item) => {
-            // Find product details to build search string
             const product = products.find((p) => String(p.id) === String(item.product));
             const partNumber = product?.part_number || "";
             const productName = item.product_name || product?.product_name || product?.name || "";
@@ -122,7 +144,6 @@ export default function AddDraftSale() {
             };
           });
           setManualItems(items);
-          // Add an empty row at the end if needed
           setManualItems((prev) => [...prev, { product: "", unit_price_bdt: "", quantity: "", search: "", showDropdown: false }]);
         }
 
@@ -135,9 +156,72 @@ export default function AddDraftSale() {
     };
 
     fetchDraft();
-  }, [id, isEditing, products]); // products dependency to have product list ready
+  }, [id, isEditing, products]);
 
-  // --- HELPERS (unchanged) ---
+  // --- Debounced customer search ---
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      if (customerSearchTerm.trim() === selectedCustomerDisplayName) {
+        setCustomerOptions([]);
+        setIsCustomerDropdownOpen(false);
+        return;
+      }
+      if (customerSearchTerm.trim().length > 0) {
+        fetchCustomerOptions(customerSearchTerm.trim());
+      } else {
+        setCustomerOptions([]);
+        setIsCustomerDropdownOpen(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounce);
+  }, [customerSearchTerm, selectedCustomerDisplayName]);
+
+  const fetchCustomerOptions = async (search) => {
+    try {
+      const response = await axiosInstance.get("person/customers/", {
+        params: { search: search },
+      });
+      const results = response.data.results || response.data || [];
+      setCustomerOptions(results);
+      setIsCustomerDropdownOpen(results.length > 0);
+    } catch (err) {
+      console.error("Customer search failed", err);
+      setCustomerOptions([]);
+      setIsCustomerDropdownOpen(false);
+    }
+  };
+
+  const selectCustomer = (customer) => {
+    setOrderData({ ...orderData, customer: customer.id });
+    const displayName = customer.shop_name || customer.proprietor_name || customer.name || "Unknown";
+    setSelectedCustomerName(displayName);
+    setSelectedCustomerDisplayName(displayName);
+    setCustomerSearchTerm(displayName);
+    setCustomerOptions([]);
+    setIsCustomerDropdownOpen(false);
+  };
+
+  const clearCustomer = () => {
+    setOrderData({ ...orderData, customer: "" });
+    setSelectedCustomerName("");
+    setSelectedCustomerDisplayName("");
+    setCustomerSearchTerm("");
+    setCustomerOptions([]);
+    setIsCustomerDropdownOpen(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (customerDropdownRef.current && !customerDropdownRef.current.contains(event.target)) {
+        setIsCustomerDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // --- HELPERS ---
   const getProductStock = (productId) => {
     const stockItem = stocks.find((s) => String(s.product) === String(productId));
     return stockItem ? stockItem.current_quantity ?? 0 : 0;
@@ -149,16 +233,11 @@ export default function AddDraftSale() {
     return brand ? brand.name : "Unknown Brand";
   };
 
-  // --- HEADER HANDLERS ---
   const handleOrderChange = (e) => {
-    if (e.target.name === "customer" && e.target.value === "ADD_NEW") {
-      setIsCustomerModalOpen(true);
-      return;
-    }
     setOrderData({ ...orderData, [e.target.name]: e.target.value });
   };
 
-  // --- MANUAL MODE (unchanged) ---
+  // --- MANUAL MODE ---
   const handleManualItemChange = (index, field, value) => {
     const newItems = [...manualItems];
     if (field === "search") {
@@ -233,7 +312,7 @@ export default function AddDraftSale() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // --- BRAND MODE (unchanged) ---
+  // --- BRAND MODE ---
   const handleBrandDropdownSelect = (e) => {
     const brandId = Number(e.target.value);
     if (!brandId) return;
@@ -295,7 +374,7 @@ export default function AddDraftSale() {
     setSelectedBrands([]);
   };
 
-  // --- CREATE CUSTOMER (unchanged) ---
+  // --- CREATE CUSTOMER ---
   const handleCreateCustomer = async (e) => {
     e.preventDefault();
     setCustomerLoading(true);
@@ -303,8 +382,8 @@ export default function AddDraftSale() {
     try {
       const response = await axiosInstance.post("person/customers/", customerPayload);
       const newlyCreatedCustomer = response.data;
-      setCustomers([...customers, newlyCreatedCustomer]);
-      setOrderData({ ...orderData, customer: newlyCreatedCustomer.id });
+      setCustomers((prev) => [...prev, newlyCreatedCustomer]);
+      selectCustomer(newlyCreatedCustomer);
       setIsCustomerModalOpen(false);
       setNewCustomerData({
         shop_name: "",
@@ -330,7 +409,7 @@ export default function AddDraftSale() {
     return sum + qty * price;
   }, 0);
 
-  // --- SUBMIT (Create or Update) ---
+  // --- SUBMIT ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -367,13 +446,11 @@ export default function AddDraftSale() {
 
     try {
       if (isEditing) {
-        // Update existing draft
         await axiosInstance.put(`draft-sale/draft-sales/${id}/`, payload);
       } else {
-        // Create new draft
         await axiosInstance.post("draft-sale/draft-sales/", payload);
       }
-      navigate("../draftlist");
+      navigate("../sales/draftlist");
     } catch (err) {
       console.error(err);
       setError(err.response?.data?.detail || "Failed to save draft. Check inputs.");
@@ -420,27 +497,89 @@ export default function AddDraftSale() {
       <form onSubmit={handleSubmit} className="bg-white border border-gray-300 overflow-hidden">
         {/* --- ORDER HEADER (Customer + Remarks) --- */}
         <div className="p-2 bg-gray-50 border-b border-gray-300 grid grid-cols-1 sm:grid-cols-2 gap-2">
-          <div>
+          {/* Customer combobox with always-visible Add New button */}
+          <div ref={customerDropdownRef} className="relative">
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Customer
             </label>
-            <select
-              name="customer"
-              value={orderData.customer}
-              onChange={handleOrderChange}
-              className="w-full bg-white border border-gray-300 rounded p-1 text-sm text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-            >
-              <option value=""> Select Customer </option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.shop_name ? `${c.shop_name} (${c.proprietor_name})` : c.proprietor_name}
-                </option>
-              ))}
-              <option value="ADD_NEW" className="bg-blue-50 text-blue-700 font-bold">
-                + Add New Customer
-              </option>
-            </select>
+            <div className="flex items-center gap-1.5">
+              <div className="flex-1 relative">
+                <div className="flex items-center border border-gray-300 rounded bg-white focus-within:ring-1 focus-within:ring-blue-500">
+                  <FiSearch className="ml-1.5 text-gray-400" size={14} />
+                  <input
+                    type="text"
+                    placeholder="Search by name, mobile or shop"
+                    value={customerSearchTerm}
+                    onChange={(e) => {
+                      const newValue = e.target.value;
+                      setCustomerSearchTerm(newValue);
+                      if (selectedCustomerDisplayName && newValue !== selectedCustomerDisplayName) {
+                        clearCustomer();
+                      }
+                      if (newValue === "") {
+                        clearCustomer();
+                      }
+                    }}
+                    onFocus={() => {
+                      if (customerSearchTerm.trim().length > 0 && customerOptions.length > 0) {
+                        setIsCustomerDropdownOpen(true);
+                      }
+                    }}
+                    className="w-full bg-transparent p-1 text-sm text-gray-800 focus:outline-none"
+                    autoComplete="off"
+                  />
+                  {orderData.customer && (
+                    <button
+                      type="button"
+                      onClick={clearCustomer}
+                      className="mr-1 text-gray-400 hover:text-red-500"
+                    >
+                      <FiX size={14} />
+                    </button>
+                  )}
+                </div>
+                {isCustomerDropdownOpen && customerOptions.length > 0 && (
+                  <div className="absolute left-0 right-0 top-full mt-0.5 bg-white border border-gray-300 rounded shadow-lg max-h-60 overflow-y-auto z-50">
+                    <ul>
+                      {customerOptions.map((cust) => {
+                        const display = cust.shop_name || cust.proprietor_name || cust.name || "Unknown";
+                        return (
+                          <li
+                            key={cust.id}
+                            className="px-2 py-1.5 hover:bg-blue-100 cursor-pointer text-sm flex justify-between items-center"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              selectCustomer(cust);
+                            }}
+                          >
+                            <span>{display}</span>
+                            <span className="text-[10px] text-gray-500">{cust.mobile1}</span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                )}
+              </div>
+              {/* Always-visible Add New Customer button */}
+              <button
+                type="button"
+                onClick={() => {
+                  setIsCustomerDropdownOpen(false);
+                  setIsCustomerModalOpen(true);
+                }}
+                className="flex-shrink-0 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-xs font-semibold transition flex items-center gap-1 border border-blue-700"
+              >
+                <FiUserPlus size={14} /> Add New
+              </button>
+            </div>
+            {orderData.customer && (
+              <div className="mt-0.5 text-xs text-green-700 font-medium">
+                Selected: {selectedCustomerName}
+              </div>
+            )}
           </div>
+
           <div>
             <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider">
               Remarks
@@ -456,7 +595,7 @@ export default function AddDraftSale() {
           </div>
         </div>
 
-        {/* --- ENTRY MODE TOGGLE (disabled when editing) --- */}
+        {/* --- ENTRY MODE TOGGLE (unchanged) --- */}
         <div className="bg-gray-50 border-b border-gray-300 px-3 py-1.5 flex gap-2">
           <button
             type="button"
@@ -485,10 +624,9 @@ export default function AddDraftSale() {
           {isEditing && <span className="text-xs text-gray-500 ml-2">(Brand mode disabled for editing)</span>}
         </div>
 
-        {/* --- BRAND SELECTOR (hidden when editing) --- */}
+        {/* --- BRAND SELECTOR (unchanged) --- */}
         {!isEditing && entryMode === "brand" && (
           <div className="bg-blue-50/50 border-b border-gray-300 px-3 py-2 flex flex-col md:flex-row md:items-center justify-between gap-2">
-            {/* same as before */}
             <div className="flex-1 max-w-sm">
               <label className="block text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">
                 Add Brands
@@ -542,7 +680,7 @@ export default function AddDraftSale() {
           </div>
         )}
 
-        {/* --- ITEMS TABLE (no stock column) --- */}
+        {/* --- ITEMS TABLE (unchanged) --- */}
         <div className="overflow-x-auto overflow-y-visible pb-24">
           <table className="w-full border-collapse text-sm">
             <thead>
@@ -569,10 +707,9 @@ export default function AddDraftSale() {
               </tr>
             </thead>
             <tbody>
-              {entryMode === "brand" && !isEditing && // only show brand items when not editing
+              {entryMode === "brand" && !isEditing &&
                 brandItems.map((item, index) => (
                   <tr key={item.product} className={index % 2 === 0 ? "bg-white" : "bg-gray-50"}>
-                    {/* same as before */}
                     <td className="border border-gray-300 px-2 py-1.5 text-center text-xs text-gray-500">{index + 1}</td>
                     <td className="border border-gray-300 px-2 py-1.5">
                       <div className="font-medium text-gray-800 text-xs">
@@ -833,7 +970,6 @@ export default function AddDraftSale() {
               </button>
             </div>
             <form onSubmit={handleCreateCustomer} className="overflow-y-auto flex-1 p-4 space-y-3">
-              {/* same as before */}
               <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-0.5">

@@ -50,7 +50,7 @@ export default function AdminSidebar() {
         { to: "/dashboard/sales/add", label: "New Sale", icon: FiPlus },
         { to: "/dashboard/sales", label: "Sale History", icon: FiList },
         { to: "/dashboard/sales/draft", label: "New Draft", icon: FiPlus },
-        { to: "/dashboard/draftlist", label: "Draft List", icon: FiList },
+        { to: "/dashboard/sales/draftlist", label: "Draft List", icon: FiList },
       ]
     },
     {
