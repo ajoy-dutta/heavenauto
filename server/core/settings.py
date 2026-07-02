@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt', # Required for your React Login
     'corsheaders',              # Allows React to talk to Django
+    'drf_spectacular',          # <-- ADDED FOR SWAGGER INTERACTIVE DOCUMENTATION
     
     # Custom apps
     'person',
@@ -54,7 +55,6 @@ INSTALLED_APPS = [
     'capital',
     'expense',
     'account.apps.AccountConfig',
-
 ]
 
 MIDDLEWARE = [
@@ -125,12 +125,22 @@ CORS_ALLOWED_ORIGINS = [
     "http://127.0.0.1:5173",
 ]
 
-# --- FIX FOR REACT API CSRF TOKENS ---
-# This forces Django API to ONLY use your JWT token, avoiding CSRF session errors
+# --- DJANGO REST FRAMEWORK CONFIGURATION ---
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # <-- ADDED SCHEMA CLASS TO GENERATE OPENAPI 3.0 SCHEMAS
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema', 
+}
+
+# --- DRF SPECTACULAR (SWAGGER) SETTINGS ---
+DRF_SPECTACULAR_SETTINGS = {
+    'TITLE': 'Heaven Autos API',
+    'DESCRIPTION': 'Interactive API documentation for Heaven Autos application (OAS 3.0/3.1)',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
 }
 
 # Token Lifetimes (Optional but highly recommended)

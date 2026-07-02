@@ -4,9 +4,12 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from django.conf import settings
 from django.conf.urls.static import static
 
-# --- ADD THESE TWO IMPORTS ---
+# --- REST FRAMEWORK IMPORTS ---
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+
+# --- DRF SPECTACULAR IMPORTS ---
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # --- CREATE THE MASTER API ROOT VIEW ---
 @api_view(['GET'])
@@ -28,18 +31,23 @@ def master_api_root(request):
         "10. Capital API": request.build_absolute_uri('/api/capital/'),
         "11. Expense API": request.build_absolute_uri('/api/expense/'),
         "12. Account API": request.build_absolute_uri('/api/account/'),
-        
+        "Interactive Swagger Docs": request.build_absolute_uri('/api/docs/'),  # Added directory link
     })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     
-    # --- UPDATE YOUR ROOT PATHS ---
-    # Now, going to the base url or /api/ will show the master directory
+    # --- ROOT PATHS ---
     path('', master_api_root, name='master-api-root'),
     path('api/', master_api_root, name='api-root'),
     
-    # Your modular app routes
+    # --- SWAGGER INTERACTIVE API DOCUMENTATION ---
+    # Generates the OpenAPI schema JSON file behind the scenes
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    # Serves the user interface matching your reference picture
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    
+    # --- MODULAR APP ROUTES ---
     path('api/person/', include('person.urls')),
     path('api/products/', include('products.urls')),
     path('api/purchase/', include('purchase.urls')),
@@ -53,7 +61,7 @@ urlpatterns = [
     path('api/account/', include('account.urls')),
     path('api/draft-sale/', include('draftSale.urls')),
 
-    # Token Authentication
+    # --- TOKEN AUTHENTICATION ---
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
 ]
